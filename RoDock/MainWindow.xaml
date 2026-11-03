@@ -1,0 +1,146 @@
+<Window x:Class="RoDock.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="RoDock" Width="1000" Height="640" MinWidth="620" MinHeight="420"
+        Background="{StaticResource Bg}" Foreground="{StaticResource Text}">
+    <Grid Margin="24,20,24,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Top bar -->
+        <DockPanel Margin="0,0,0,16">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <CheckBox x:Name="MultiBox" Content="Multi-instance" Margin="0,0,16,0" VerticalAlignment="Center"
+                          Checked="Multi_Changed" Unchecked="Multi_Changed" />
+                <CheckBox x:Name="SimpleBox" Content="Simple mode" Margin="0,0,16,0" VerticalAlignment="Center"
+                          Checked="Mode_Changed" Unchecked="Mode_Changed" />
+                <Button Content="Discord" Click="ToggleDiscord_Click" Margin="0,0,8,0" Padding="14,6" />
+                <Button Content="Stop all" Click="StopAll_Click" Margin="0,0,8,0" Padding="14,6" />
+                <Button Content="Start all" Click="StartAll_Click" Margin="0,0,8,0" Padding="14,6" />
+                <Button Content="+ Add account" Click="ToggleAdd_Click" Style="{StaticResource PrimaryButton}" />
+            </StackPanel>
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock x:Name="TitleText" Text="RoDock" FontSize="24" FontWeight="SemiBold" />
+                <TextBlock x:Name="Subtitle" Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Add account panel -->
+        <StackPanel Grid.Row="1">
+            <Border x:Name="AddPanel" Visibility="Collapsed" Background="{StaticResource Card}" CornerRadius="12" Padding="16" Margin="0,0,0,16">
+                <StackPanel>
+                    <Button Content="Log in with Roblox..." Click="Login_Click" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" />
+                    <TextBlock Text="or paste the .ROBLOSECURITY cookie of the account" Foreground="{StaticResource Muted}" Margin="0,14,0,8" />
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Add" Click="Add_Click" Style="{StaticResource PrimaryButton}" Margin="10,0,0,0" />
+                        <PasswordBox x:Name="CookieBox" />
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+            <Border x:Name="DiscordPanel" Visibility="Collapsed" Background="{StaticResource Card}" CornerRadius="12" Padding="16" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="Discord bot: remote control (/status /start /stop /rejoin /startall /stopall) and alerts" Foreground="{StaticResource Muted}" Margin="0,0,0,10" />
+                    <TextBlock Text="Bot token (leave empty to keep the saved one)" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,4" />
+                    <PasswordBox x:Name="TokenBox" />
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="10" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Your Discord user ID (only you can use commands)" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,4" />
+                            <TextBox x:Name="UserIdBox" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Alert channel ID (optional)" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,4" />
+                            <TextBox x:Name="ChannelIdBox" />
+                        </StackPanel>
+                    </Grid>
+                    <Button Content="Save &amp; connect" Click="SaveDiscord_Click" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Margin="0,12,0,0" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- Full mode: cards -->
+        <ScrollViewer x:Name="FullView" Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="Cards">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Width="330" Margin="0,0,16,16" Padding="18" CornerRadius="16" Background="{StaticResource Card}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid Width="56" Height="56">
+                                        <Ellipse Fill="{StaticResource CardHi}" />
+                                        <Ellipse>
+                                            <Ellipse.Fill><ImageBrush ImageSource="{Binding AvatarUrl}" Stretch="UniformToFill" /></Ellipse.Fill>
+                                        </Ellipse>
+                                    </Grid>
+                                    <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}" FontSize="17" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <DockPanel Margin="0,5,0,0">
+                                            <Ellipse Style="{StaticResource Dot}" DockPanel.Dock="Left" VerticalAlignment="Top" Margin="0,4,0,0" />
+                                            <TextBlock Text="{Binding Status}" Foreground="{StaticResource Muted}" Margin="7,0,0,0" FontSize="12"
+                                                       TextWrapping="Wrap" MaxHeight="34" ToolTip="{Binding Status}" />
+                                        </DockPanel>
+                                    </StackPanel>
+                                    <Button Grid.Column="2" Style="{StaticResource RunButton}" Click="Toggle_Click" VerticalAlignment="Center" MinWidth="64" />
+                                </Grid>
+
+                                <Border Background="{StaticResource CardHi}" CornerRadius="10" Padding="10" Margin="0,16,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Border Width="36" Height="36" CornerRadius="8">
+                                            <Border.Background><ImageBrush ImageSource="{Binding GameIcon}" Stretch="UniformToFill" /></Border.Background>
+                                        </Border>
+                                        <TextBlock Text="{Binding GameName, TargetNullValue='No game set'}" VerticalAlignment="Center" Margin="12,0,0,0"
+                                                   TextTrimming="CharacterEllipsis" MaxWidth="220" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Expander Header="Settings" Margin="0,10,0,0" Foreground="{StaticResource Muted}">
+                                    <StackPanel Margin="0,8,0,0">
+                                        <TextBlock Text="Place ID" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,4" />
+                                        <TextBox Text="{Binding PlaceId, TargetNullValue='', UpdateSourceTrigger=LostFocus}" />
+                                        <TextBlock Text="Private server link (optional)" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,10,0,4" />
+                                        <TextBox Text="{Binding PrivateServerLink, UpdateSourceTrigger=LostFocus}" />
+                                        <Button Content="Remove account" Click="Remove_Click" Margin="0,12,0,0" HorizontalAlignment="Left" />
+                                    </StackPanel>
+                                </Expander>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Simple mode: plain list -->
+        <DataGrid x:Name="SimpleView" Grid.Row="2" Visibility="Collapsed" AutoGenerateColumns="False" CanUserAddRows="False"
+                  SelectionMode="Extended" HeadersVisibility="Column" GridLinesVisibility="Horizontal">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Account" Binding="{Binding Name}" IsReadOnly="True" Width="150" />
+                <DataGridTextColumn Header="Place ID" Binding="{Binding PlaceId, TargetNullValue=''}" Width="130" />
+                <DataGridTextColumn Header="Private server link" Binding="{Binding PrivateServerLink}" Width="*" />
+                <DataGridTextColumn Header="Status" Binding="{Binding Status, Mode=OneWay}" IsReadOnly="True" Width="240" />
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Footer -->
+        <DockPanel Grid.Row="3" Margin="0,12,0,0">
+            <StackPanel x:Name="SimpleActions" DockPanel.Dock="Right" Orientation="Horizontal" Visibility="Collapsed">
+                <Button Content="Start selected" Click="StartSelected_Click" Margin="0,0,8,0" />
+                <Button Content="Stop selected" Click="StopSelected_Click" Margin="0,0,8,0" />
+                <Button Content="Remove selected" Click="RemoveSelected_Click" />
+            </StackPanel>
+            <TextBlock x:Name="Message" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        </DockPanel>
+    </Grid>
+</Window>

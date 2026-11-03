@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="RoDock/RoDock.csproj" />
+  <Project Path="RoDock.Tests/RoDock.Tests.csproj" />
+</Solution>
