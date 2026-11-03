@@ -5,7 +5,8 @@ using System.Windows;
 
 namespace RoDock;
 
-public record Settings(bool Simple = false, bool Multi = true);
+/// Resume = user ids of accounts that were running when an update restarted the app; they are started again on the next launch.
+public record Settings(bool Simple = false, bool Multi = true, long[]? Resume = null);
 
 public partial class MainWindow : Window
 {
@@ -16,6 +17,8 @@ public partial class MainWindow : Window
     readonly string _settingsPath;
     readonly ObservableCollection<Account> _accounts = [];
     readonly Supervisor _supervisor = new();
+    readonly Updater _updater = new();
+    readonly System.Windows.Threading.DispatcherTimer _updateTimer = new() { Interval = TimeSpan.FromHours(4) };
     readonly DiscordBot _bot;
     readonly string _discordPath;
     DiscordConfig? _discord;
@@ -53,6 +56,47 @@ public partial class MainWindow : Window
         if (s.Multi) ApplyMulti();
         ApplyMode();
         RefreshSubtitle();
+
+        if (s.Resume is { Length: > 0 })
+        {
+            foreach (var a in _accounts.Where(a => s.Resume.Contains(a.UserId))) _supervisor.Start(a);
+            SaveSettings(); // clears the resume list
+        }
+
+        _updateTimer.Tick += async (_, _) => await CheckUpdate();
+        _updateTimer.Start();
+        _ = CheckUpdate(); // also at every launch
+    }
+
+    // ---- updates ----
+
+    async Task CheckUpdate()
+    {
+        if (await _updater.Check() is not { } version) return;
+        UpdateText.Text = $"RoDock {version} is available";
+        UpdateToast.Visibility = Visibility.Visible;
+    }
+
+    void DismissUpdate_Click(object s, RoutedEventArgs e) => UpdateToast.Visibility = Visibility.Collapsed;
+
+    async void Update_Click(object s, RoutedEventArgs e)
+    {
+        UpdateButton.IsEnabled = false;
+        UpdateText.Text = "Downloading update...";
+        try
+        {
+            await _updater.Download(); // accounts keep running while this downloads
+            var running = _accounts.Where(a => a.Running).ToList();
+            SaveSettings(running.Select(a => a.UserId).ToArray());
+            await Task.WhenAll(running.Select(_supervisor.Stop)); // close their clients so none are orphaned by the restart
+            _updater.ApplyAndRestart();
+        }
+        catch (Exception ex)
+        {
+            UpdateButton.IsEnabled = true;
+            UpdateText.Text = "Update failed";
+            Message.Text = $"Update failed: {ex.Message}";
+        }
     }
 
     // ---- accounts ----
@@ -196,9 +240,9 @@ public partial class MainWindow : Window
         catch (Exception ex) { MultiBox.IsChecked = false; Message.Text = ex.Message; }
     }
 
-    void SaveSettings()
+    void SaveSettings(long[]? resume = null)
     {
-        try { Directory.CreateDirectory(Dir); File.WriteAllText(_settingsPath, JsonSerializer.Serialize(new Settings(SimpleBox.IsChecked == true, MultiBox.IsChecked == true))); }
+        try { Directory.CreateDirectory(Dir); File.WriteAllText(_settingsPath, JsonSerializer.Serialize(new Settings(SimpleBox.IsChecked == true, MultiBox.IsChecked == true, resume))); }
         catch { } // a lost preference is not worth an error dialog
     }
 }

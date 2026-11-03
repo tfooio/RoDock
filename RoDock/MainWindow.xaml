@@ -142,5 +142,18 @@
             </StackPanel>
             <TextBlock x:Name="Message" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
         </DockPanel>
+
+        <!-- Update notice (bottom-right corner) -->
+        <Border x:Name="UpdateToast" Grid.RowSpan="4" Visibility="Collapsed" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,0,44"
+                Background="{StaticResource Card}" BorderBrush="{StaticResource Accent}" BorderThickness="1" CornerRadius="12" Padding="16,12">
+            <StackPanel>
+                <TextBlock x:Name="UpdateText" FontWeight="SemiBold" />
+                <TextBlock Text="Running accounts are restarted automatically." Foreground="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" />
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <Button x:Name="UpdateButton" Content="Update &amp; restart" Click="Update_Click" Style="{StaticResource PrimaryButton}" />
+                    <Button Content="Later" Click="DismissUpdate_Click" Margin="8,0,0,0" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>

@@ -69,6 +69,7 @@ static void RunPreview(string outDir)
     Directory.CreateDirectory(outDir);
     var t = new Thread(() =>
     {
+        Velopack.VelopackApp.Build().Run(); // the real app does this in Program.Main
         var app = new RoDock.App();
         app.InitializeComponent();
         foreach (var simple in new[] { false, true })
@@ -91,6 +92,8 @@ static void RunPreview(string outDir)
             a[1].Running = true; a[1].Report("Left the game. Retrying in 24s", Kind.Warn);
             a[2].Running = true; a[2].Report("Joining...", Kind.Working);
             a[3].Report("Set a Place ID first", Kind.Bad);
+            w.UpdateText.Text = "RoDock 0.2.0 is available";
+            w.UpdateToast.Visibility = Visibility.Visible;
             Wait(6000);
 
             var rtb = new RenderTargetBitmap((int)w.ActualWidth, (int)w.ActualHeight, 96, 96, PixelFormats.Pbgra32);

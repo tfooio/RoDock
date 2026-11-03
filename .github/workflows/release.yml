@@ -1,0 +1,28 @@
+# Push a tag like v0.1.1 to build, package and publish a release. Installed copies update themselves from it.
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Version from tag
+        id: v
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - run: dotnet tool restore
+      - name: Self-checks must pass
+        run: dotnet run --project RoDock.Tests
+      - run: dotnet publish RoDock -c Release -r win-x64 --self-contained -o publish -p:Version=${{ steps.v.outputs.version }}
+      - name: Fetch previous releases (for small delta updates)
+        continue-on-error: true # the first release has none
+        run: dotnet vpk download github --repoUrl https://github.com/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
+      - run: dotnet vpk pack --packId RoDock --packVersion ${{ steps.v.outputs.version }} --packDir publish --mainExe RoDock.exe
+      - run: dotnet vpk upload github --repoUrl https://github.com/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }} --publish --releaseName "RoDock ${{ steps.v.outputs.version }}" --tag ${{ github.ref_name }}
