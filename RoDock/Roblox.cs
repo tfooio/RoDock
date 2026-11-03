@@ -11,7 +11,8 @@ public class AuthException() : Exception("Cookie expired. Re-add the account.");
 
 public static class Roblox
 {
-    static readonly HttpClient Http = new(new HttpClientHandler { UseCookies = false }) { Timeout = TimeSpan.FromSeconds(20) };
+    // Redirects are followed by hand in Send() so the cookie can never be forwarded to a non-Roblox host.
+    static readonly HttpClient Http = new(new HttpClientHandler { UseCookies = false, AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(20) };
     static readonly ConcurrentDictionary<string, string> Csrf = new();
     static readonly ConcurrentDictionary<long, (string Name, string? Icon)> Games = new();
     static Mutex? _multi;
@@ -24,24 +25,40 @@ public static class Roblox
         return r;
     }
 
+    /// Only https://roblox.com and its subdomains may ever receive the cookie.
+    public static bool IsRoblox(Uri u) => u.Scheme == Uri.UriSchemeHttps && (u.Host == "roblox.com" || u.Host.EndsWith(".roblox.com", StringComparison.Ordinal));
+
     /// Authenticated request. Handles Roblox's CSRF dance (403 + x-csrf-token, then resend) and maps 401 to AuthException.
     static async Task<HttpResponseMessage> Send(HttpMethod method, string url, string cookie, string? json = null)
     {
-        async Task<HttpResponseMessage> Once()
+        if (!IsRoblox(new Uri(url))) throw new InvalidOperationException("Refusing to send the cookie to a non-Roblox address.");
+
+        async Task<HttpResponseMessage> Once(string target)
         {
-            var r = Req(method, url, cookie);
+            var r = Req(method, target, cookie);
             if (method == HttpMethod.Post) r.Content = new StringContent(json ?? "", Encoding.UTF8, "application/json");
             if (Csrf.TryGetValue(cookie, out var t)) r.Headers.TryAddWithoutValidation("x-csrf-token", t);
             return await Http.SendAsync(r);
         }
 
-        var res = await Once();
+        var res = await Once(url);
         if (res.StatusCode == System.Net.HttpStatusCode.Forbidden && res.Headers.TryGetValues("x-csrf-token", out var fresh))
         {
             Csrf[cookie] = fresh.First();
             res.Dispose();
-            res = await Once();
+            res = await Once(url);
         }
+
+        // Only GETs follow redirects (the game page does), and only to Roblox.
+        for (var hops = 0; method == HttpMethod.Get && res.Headers.Location is { } loc && (int)res.StatusCode is >= 300 and < 400; hops++)
+        {
+            var next = loc.IsAbsoluteUri ? loc : new Uri(new Uri(url), loc);
+            res.Dispose();
+            if (hops >= 5 || !IsRoblox(next)) throw new InvalidOperationException("Blocked a redirect away from roblox.com.");
+            url = next.ToString();
+            res = await Once(url);
+        }
+
         if (res.StatusCode == System.Net.HttpStatusCode.Unauthorized) { res.Dispose(); throw new AuthException(); }
         return res;
     }
@@ -115,6 +132,8 @@ public static class Roblox
         var ticket = await GetAuthTicket(cookie);
         var tracker = $"{Random.Shared.Next(100000, 175000)}{Random.Shared.Next(100000, 900000)}";
         var uri = BuildLaunchUri(ticket, placeId, access, code, tracker, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        // Windows hands this string to Roblox's registered handler; whitespace could smuggle extra command-line arguments.
+        if (uri.Any(char.IsWhiteSpace)) throw new InvalidOperationException("Refusing to launch: unexpected characters in the launch link.");
 
         var before = RobloxPids();
         Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });

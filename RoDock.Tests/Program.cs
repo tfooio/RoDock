@@ -47,6 +47,14 @@ Check((await cmds.Handle("start", " alpha ")).Contains("Starting **Alpha**"), "/
 Check((await cmds.Handle("stop", "Beta")).Contains("Stopped **Beta**"), "/stop");
 Check((await cmds.Handle("nonsense", "Beta")).StartsWith("Unknown command"), "unknown command");
 
+// The cookie may only ever go to Roblox over https (look-alike hosts and plain http are refused).
+Check(Roblox.IsRoblox(new Uri("https://www.roblox.com/x")) && Roblox.IsRoblox(new Uri("https://roblox.com")) && Roblox.IsRoblox(new Uri("https://auth.roblox.com")), "roblox hosts allowed");
+Check(!Roblox.IsRoblox(new Uri("https://evilroblox.com")) && !Roblox.IsRoblox(new Uri("https://roblox.com.evil.com")) &&
+      !Roblox.IsRoblox(new Uri("http://www.roblox.com")) && !Roblox.IsRoblox(new Uri("https://evil.com/.roblox.com")), "look-alike hosts refused");
+
+// The Discord token must never show up in text (logs, errors).
+Check(!new DiscordConfig("SECRET-TOKEN", 42, 7).ToString().Contains("SECRET-TOKEN"), "DiscordConfig.ToString hides token");
+
 // Discord token must be stored encrypted.
 var dpath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".dat");
 Vault.Write(dpath, new DiscordConfig("SECRET-TOKEN", 42, 7));

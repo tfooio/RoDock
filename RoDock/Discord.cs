@@ -5,7 +5,11 @@ using Discord.WebSocket;
 namespace RoDock;
 
 /// Saved encrypted in discord.dat. UserId is the only Discord user allowed to run commands.
-public record DiscordConfig(string Token, ulong UserId, ulong ChannelId);
+public record DiscordConfig(string Token, ulong UserId, ulong ChannelId)
+{
+    // A record prints all its fields by default; keep the token out of any log or error text.
+    public override string ToString() => $"DiscordConfig {{ UserId = {UserId}, ChannelId = {ChannelId}, Token = ***** }}";
+}
 
 /// Slash-command remote control + drop/recovery alerts. Commands answer only to the configured user, privately (ephemeral).
 public class DiscordBot(Commands commands)
@@ -78,7 +82,7 @@ public class DiscordBot(Commands commands)
     {
         try
         {
-            if (_config is { ChannelId: > 0 } c && _client?.GetChannel(c.ChannelId) is IMessageChannel ch) await ch.SendMessageAsync(text);
+            if (_config is { ChannelId: > 0 } c && _client?.GetChannel(c.ChannelId) is IMessageChannel ch) await ch.SendMessageAsync(text, allowedMentions: AllowedMentions.None);
         }
         catch { } // an alert that fails to send must never break the rejoin loop
     }

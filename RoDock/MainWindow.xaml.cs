@@ -100,6 +100,11 @@ public partial class MainWindow : Window
 
     async Task AddCookie(string cookie)
     {
+        if (cookie.Length > 4096 || cookie.Any(c => char.IsWhiteSpace(c) || char.IsControl(c)))
+        {
+            Message.Text = "That doesn't look like a .ROBLOSECURITY cookie (it is one line, with no spaces).";
+            return;
+        }
         try
         {
             var (id, name) = await Roblox.GetUser(cookie);

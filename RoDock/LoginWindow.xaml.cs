@@ -17,6 +17,9 @@ public partial class LoginWindow : Window
     public LoginWindow()
     {
         InitializeComponent();
+        // Clean up profiles a crashed earlier login may have left behind.
+        foreach (var old in Directory.EnumerateDirectories(Path.GetTempPath(), "RoDock-login-*"))
+            try { Directory.Delete(old, true); } catch { }
         Loaded += async (_, _) => await Start();
         Closed += (_, _) =>
         {
@@ -32,6 +35,9 @@ public partial class LoginWindow : Window
         {
             // Fresh profile each time, so the previous account's login never leaks into the next one.
             await Web.EnsureCoreWebView2Async(await CoreWebView2Environment.CreateAsync(userDataFolder: _profile));
+            // Stay on roblox.com: the user types real credentials here, so never let the page send them somewhere else.
+            Web.CoreWebView2.NavigationStarting += (_, e) => { if (!Uri.TryCreate(e.Uri, UriKind.Absolute, out var u) || !Roblox.IsRoblox(u)) e.Cancel = true; };
+            Web.CoreWebView2.NewWindowRequested += (_, e) => e.Handled = true; // no pop-up windows
             Web.CoreWebView2.Navigate("https://www.roblox.com/login");
             _poll.Tick += async (_, _) => await CheckCookie();
             _poll.Start();
@@ -50,6 +56,7 @@ public partial class LoginWindow : Window
         {
             _poll.Stop();
             Cookie = c.Value;
+            Web.CoreWebView2.CookieManager.DeleteAllCookies(); // don't leave the login in the temp profile (local only; the Roblox session stays valid)
             DialogResult = true;
         }
     }
