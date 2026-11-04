@@ -58,6 +58,31 @@ Check(Roblox.ShareCode("https://www.roblox.com/share?code=0ac3ad5cec2742449f1b43
 
 Check(!Roblox.IsProtocolRegistered("roblox-no-such-scheme-xyz"), "unregistered protocol is reported as missing");
 
+// Roblox error numbers: the table covers the official list and picks the right action.
+Check(RobloxErrors.Count == 97, "error table has every item of the official list except OK (97)");
+Check(RobloxErrors.Describe(2) == ("Error 2 (ConnectErrors)", Act.Retry), "error 2 = connect error, retry");
+Check(RobloxErrors.Describe(277).Act == Act.Retry && RobloxErrors.Describe(278).Act == Act.Retry, "connection lost and idle kick are retried");
+Check(RobloxErrors.Describe(273).Act == Act.Slow && RobloxErrors.Describe(275).Act == Act.Slow, "same-account and maintenance wait longer");
+Check(new[] { 5, 286, 287, 515, 523, 524, 600, 770, 773 }.All(c => RobloxErrors.Describe(c).Act == Act.Stop), "bans, moderation, revoked or missing games stop");
+Check(RobloxErrors.Describe(9999).Act == Act.Retry && RobloxErrors.Describe(null).Act == Act.Retry, "unknown or missing number retries");
+
+// Real lines from a Roblox client log (the "Error Code: 2" case): the failure is found, and ordinary noise is ignored.
+const string sample = """
+    2026-11-04T01:07:19.286Z,1.0,1,6 [FLog::Output] ! Joining game 'g' place 8304191830 at 1.2.3.4
+    2026-11-04T01:07:19.378Z,1.0,1,6 [DFLog::SignalRCoreError] ID: 1 Disconnected - stop() called
+    2026-11-04T01:07:34.581Z,1.0,1,6 [FLog::Network] Connection attempt failed
+    2026-11-04T01:07:34.582Z,1.0,1,6 [DFLog::NetworkClient] Server reached at 1.2.3.4|51918, but handshake failed. Connection error 2
+    2026-11-04T01:07:34.593Z,1.0,1,6 [FLog::Output] Session Transition FSM: Error Occurred.
+    2026-11-04T01:08:26.928Z,1.0,1,6 [DFLog::RbxTransportDummyClient] Disconnected from server for reason: Player: 285 (DisconnectClientInitiated)
+    2026-11-04T01:09:00.000Z,1.0,1,6 [FLog::Network] Sending disconnect with reason: 285
+    """;
+var events = ClientLog.Parse(sample).ToList();
+Check(events.Count == 6 && events[0].Kind == LogKind.Join, "log: join found, SignalR noise ignored");
+Check(events[2] == new LogEvent(LogKind.Failure, 2) && events[1] == new LogEvent(LogKind.Failure, null), "log: 'Connection error 2' read as code 2");
+Check(events[4] == new LogEvent(LogKind.Failure, 285) && events[5] == new LogEvent(LogKind.Failure, 285), "log: disconnect reasons read as codes");
+Check(Supervisor.FirstFailure(events.Skip(1))!.Reason == "Error 2 (ConnectErrors)", "failure picks the first numbered error");
+Check(Supervisor.FirstFailure(events.Take(1)) is null, "a join alone is not a failure");
+
 // The cookie may only ever go to Roblox over https (look-alike hosts and plain http are refused).
 Check(Roblox.IsRoblox(new Uri("https://www.roblox.com/x")) && Roblox.IsRoblox(new Uri("https://roblox.com")) && Roblox.IsRoblox(new Uri("https://auth.roblox.com")), "roblox hosts allowed");
 Check(!Roblox.IsRoblox(new Uri("https://evilroblox.com")) && !Roblox.IsRoblox(new Uri("https://roblox.com.evil.com")) &&
@@ -231,6 +256,7 @@ static void RunCloseCheck()
         Thread.Sleep(9000);
         var account = new Account { Pids = Rb().Select(p => p.Id).ToArray() };
         var started = account.Pids.Length;
+        Console.WriteLine($"round {round}: client log found for the new process: {account.Pids.Select(ClientLog.For).Any(l => l is not null)}");
         Supervisor.CloseClients(account).Wait();
         Thread.Sleep(2000);
         var left = Rb().Length;

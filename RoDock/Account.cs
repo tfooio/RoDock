@@ -41,5 +41,8 @@ public class Account : INotifyPropertyChanged
     /// Roblox client processes we started for this account (not saved).
     [JsonIgnore] public int[] Pids = [];
 
+    /// The Roblox log of the client we started (not saved).
+    [JsonIgnore] public ClientLog? Log;
+
     public void Report(string text, Kind kind) { Status = text; StatusKind = kind; }
 }
