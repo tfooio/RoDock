@@ -28,6 +28,31 @@ Check(back.Name == "alt1" && back.Cookie == "SECRET-COOKIE" && back.UserId == 7 
 Check(back.Status == "Idle" && !back.Running, "live state must not be persisted");
 File.Delete(path);
 
+// History (dashboard charts): minutes and rejoins add up per hour/day/account, survive a save and reload, and old hours are dropped.
+var hpath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
+var hist0 = new History(hpath);
+hist0.InGameMinute(7); hist0.InGameMinute(7); hist0.InGameMinute(8); hist0.Rejoin();
+hist0.Add(DateTime.UtcNow.AddDays(-20), 7, 500, 9); // too old to keep
+hist0.Save();
+var hist1 = new History(hpath);
+Check(hist1.MinutesPerAccount(7)[7] == 2 && hist1.MinutesPerAccount(7)[8] == 1, "history: minutes per account survive a reload");
+Check(hist1.RejoinsPerDay(7)[^1].Rejoins == 1 && hist1.RejoinsPerDay(7).Length == 7, "history: today's rejoin counted, 7 days returned");
+Check(hist1.Hourly(24).Length == 24 && hist1.Hourly(24)[^1] > 0 && hist1.Hourly(24)[0] == 0, "history: hourly series ends with the current hour");
+Check(!hist1.MinutesPerAccount(30).ContainsKey(99) && hist1.MinutesPerAccount(30)[7] == 2, "history: entries older than 8 days are dropped on save");
+File.Delete(hpath);
+
+// Themes: built-ins come first; a saved edit replaces its built-in, other saved themes follow; settings round-trip through JSON.
+var edited = Themes.Presets[3] with { Bg = "#000000" };
+var own = new Theme("Custom", "#102A43", "#1B3B5A", "#0B1F33", "#FF7A59", "#FFFFFF");
+var merged = Themes.Merge([own, edited]);
+Check(merged.Count == Themes.Presets.Length + 1 && merged[3].Bg == "#000000" && merged[^1].Name == "Custom" && merged[0] == Themes.Presets[0], "themes: edits replace built-ins, own themes are appended");
+Check(Themes.Merge(null).SequenceEqual(Themes.Presets), "themes: nothing saved = the built-ins");
+var json = System.Text.Json.JsonSerializer.Serialize(new Settings(false, true, null, "Custom", [own]));
+var settingsBack = System.Text.Json.JsonSerializer.Deserialize<Settings>(json)!;
+Check(settingsBack.ThemeName == "Custom" && settingsBack.Themes![0] == own, "themes: settings round-trip");
+Check(System.Text.Json.JsonSerializer.Deserialize<Settings>("{\"Simple\":true}")!.ThemeName is null, "themes: old settings files still load");
+Check(own.With("Accent", "#123456").Accent == "#123456" && own.With("Text", "#ABCDEF").Get("Text") == "#ABCDEF", "themes: With/Get address the right colour");
+
 // Launch URIs.
 var plain = Roblox.BuildLaunchUri("TICKET", 123, null, null, "999", 1);
 var priv = Roblox.BuildLaunchUri("TICKET", 123, "aaaa-bbbb", "LINK", "999", 1);
@@ -108,27 +133,43 @@ static void RunPreview(string outDir)
         Velopack.VelopackApp.Build().Run(); // the real app does this in Program.Main
         var app = new RoDock.App();
         app.InitializeComponent();
-        foreach (var simple in new[] { false, true })
+        foreach (var mode in new[] { "full", "simple", "empty", "midnight", "rose", "themes" })
         {
+            var simple = mode == "simple";
+            var custom = new Theme("Custom", "#102A43", "#1B3B5A", "#0B1F33", "#FF7A59", "#FFFFFF");
+            var themeName = mode switch { "midnight" => "Midnight", "rose" => "Rose", "themes" => "Custom", _ => null };
             var dir = Path.Combine(Path.GetTempPath(), "rl-preview-" + Guid.NewGuid());
             Directory.CreateDirectory(dir);
             var store = new Store(Path.Combine(dir, "accounts.dat"));
-            store.Save([
-                new Account { Name = "builderman", Cookie = "x", UserId = 156, PlaceId = 4924922222 },
-                new Account { Name = "Shedletsky", Cookie = "x", UserId = 261, PlaceId = 4924922222, PrivateServerLink = "https://www.roblox.com/games/4924922222/Brookhaven?privateServerLinkCode=123" },
-                new Account { Name = "Roblox", Cookie = "x", UserId = 1, PlaceId = 920587237 },
-                new Account { Name = "alt_four", Cookie = "x", UserId = 2 },
-            ]);
-            File.WriteAllText(Path.Combine(dir, "settings.json"), $"{{\"Simple\":{simple.ToString().ToLower()},\"Multi\":false}}");
+            if (mode != "empty")
+            {
+                store.Save([
+                    new Account { Name = "builderman", Cookie = "x", UserId = 156, PlaceId = 4924922222 },
+                    new Account { Name = "Shedletsky", Cookie = "x", UserId = 261, PlaceId = 4924922222, PrivateServerLink = "https://www.roblox.com/games/4924922222/Brookhaven?privateServerLinkCode=123" },
+                    new Account { Name = "Roblox", Cookie = "x", UserId = 1, PlaceId = 920587237 },
+                    new Account { Name = "alt_four", Cookie = "x", UserId = 2 },
+                ]);
+                // A week of made-up history so the charts have something to draw.
+                var hist = new History(Path.Combine(dir, "history.json"));
+                for (var h = 0; h < 24 * 7; h++)
+                    foreach (var (id, hours) in new[] { (156L, 22), (261L, 12), (1L, 7), (2L, 3) })
+                        if ((h * 7 + id) % 24 < hours) hist.Add(DateTime.UtcNow.AddHours(-h), id, 55, h % 13 == 0 ? 1 : 0);
+                hist.Save();
+            }
+            File.WriteAllText(Path.Combine(dir, "settings.json"), System.Text.Json.JsonSerializer.Serialize(new Settings(simple, false, null, themeName, mode == "themes" ? [custom] : null)));
 
             var w = new MainWindow(store, Path.Combine(dir, "settings.json")) { Left = -5000, Top = 0, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual };
             w.Show();
             var a = w.Accounts;
-            a[0].Running = true; a[0].Report("In game", Kind.Good);
-            a[1].Running = true; a[1].Report("Left the game. Retrying in 24s", Kind.Warn);
-            a[2].Running = true; a[2].Report("Joining...", Kind.Working);
-            a[3].Report("Set a Place ID first", Kind.Bad);
-            w.UpdateText.Text = "RoDock 0.2.0 is available";
+            if (a.Count > 0)
+            {
+                a[0].Running = true; a[0].Report("In game", Kind.Good);
+                a[1].Running = true; a[1].Report("Left the game. Retrying in 24s", Kind.Warn);
+                a[2].Running = true; a[2].Report("Joining...", Kind.Working);
+                a[3].Report("Set a Place ID first", Kind.Bad);
+            }
+            if (mode == "themes") w.ThemeToggle.IsChecked = true;
+            w.UpdateText.Text = "Update to 0.2.0";
             w.UpdateToast.Visibility = Visibility.Visible;
             Wait(6000);
 
@@ -136,9 +177,21 @@ static void RunPreview(string outDir)
             rtb.Render(w);
             var enc = new PngBitmapEncoder();
             enc.Frames.Add(BitmapFrame.Create(rtb));
-            using (var fs = File.Create(Path.Combine(outDir, simple ? "simple.png" : "full.png"))) enc.Save(fs);
+            using (var fs = File.Create(Path.Combine(outDir, mode + ".png"))) enc.Save(fs);
             w.Close();
         }
+
+        // The colour picker on its own (a Popup is a separate window and is not part of the window render).
+        var picker = new ColorPicker();
+        picker.SetColor(Color.FromRgb(0xFF, 0x7A, 0x59));
+        var host = new System.Windows.Controls.Border { Padding = new Thickness(16), CornerRadius = new CornerRadius(20), Background = (Brush)app.FindResource("Deep"), Child = picker };
+        host.Measure(new Size(400, 400));
+        host.Arrange(new Rect(host.DesiredSize));
+        var prtb = new RenderTargetBitmap((int)host.ActualWidth, (int)host.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+        prtb.Render(host);
+        var penc = new PngBitmapEncoder();
+        penc.Frames.Add(BitmapFrame.Create(prtb));
+        using (var pfs = File.Create(Path.Combine(outDir, "picker.png"))) penc.Save(pfs);
     });
     t.SetApartmentState(ApartmentState.STA);
     t.Start();

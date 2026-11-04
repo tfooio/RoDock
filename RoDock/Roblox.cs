@@ -17,7 +17,7 @@ public static class Roblox
     // Redirects are followed by hand in Send() so the cookie can never be forwarded to a non-Roblox host.
     static readonly HttpClient Http = new(new HttpClientHandler { UseCookies = false, AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(20) };
     static readonly ConcurrentDictionary<string, string> Csrf = new();
-    static readonly ConcurrentDictionary<long, (string Name, string? Icon)> Games = new();
+    static readonly ConcurrentDictionary<long, (string Name, string? Icon, string? Thumb)> Games = new();
     static Mutex? _multi;
 
     static HttpRequestMessage Req(HttpMethod method, string url, string cookie)
@@ -198,7 +198,18 @@ public static class Roblox
     public static Task<string?> AvatarUrl(long userId) =>
         ImageUrl($"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={userId}&size=150x150&format=Png&isCircular=false");
 
-    public static async Task<(string Name, string? Icon)?> GameInfo(long placeId)
+    /// The wide (16:9) game screenshot used as the tile art.
+    static async Task<string?> GameThumb(long universe)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(await Http.GetStringAsync($"https://thumbnails.roblox.com/v1/games/multiget/thumbnails?universeIds={universe}&countPerUniverse=1&defaults=true&size=768x432&format=Png&isCircular=false"));
+            return doc.RootElement.GetProperty("data")[0].GetProperty("thumbnails")[0].GetProperty("imageUrl").GetString();
+        }
+        catch { return null; }
+    }
+
+    public static async Task<(string Name, string? Icon, string? Thumb)?> GameInfo(long placeId)
     {
         if (Games.TryGetValue(placeId, out var cached)) return cached;
         try
@@ -208,7 +219,7 @@ public static class Roblox
             using var g = JsonDocument.Parse(await Http.GetStringAsync($"https://games.roblox.com/v1/games?universeIds={universe}"));
             var name = g.RootElement.GetProperty("data")[0].GetProperty("name").GetString()!;
             var icon = await ImageUrl($"https://thumbnails.roblox.com/v1/games/icons?universeIds={universe}&returnPolicy=PlaceHolder&size=150x150&format=Png&isCircular=false");
-            return Games[placeId] = (name, icon);
+            return Games[placeId] = (name, icon, await GameThumb(universe));
         }
         catch { return null; }
     }

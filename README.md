@@ -12,7 +12,8 @@ Needs Windows 10/11 (the login window uses the Microsoft Edge WebView2 runtime, 
 ## Use
 - **Add account:** `+ Add account` -> `Log in with Roblox...` (or paste a cookie).
 - **Per account:** set a Place ID and optionally a private server link, then Start. RoDock closes the old client, launches, waits until you are in game, and relaunches with backoff (10s..5min, paused after 5 failures) if you drop.
-- **Simple mode** gives a plain list; the default view is cards with avatars and game icons.
+- **Dashboard** (default): the selected account up top, a tile per account with its game art, an activity list, and charts (accounts in game over 24 h, rejoins per day, hours online per account). Click a tile or an avatar in the right-hand dock to select it; the sliders icon opens its Place ID, private server link and Remove. The list icon in the left rail switches to a plain list.
+- **Themes:** the palette icon in the left rail opens the theme panel. Pick a built-in theme (Dusty blue, Midnight, Forest, Rose, Sunset), click any of its five colours to change it with the colour picker, or press `New theme` to start your own copy. `Reset` restores a built-in theme; your choice and edits are saved in `settings.json`.
 - **Discord:** create a bot, then `Discord` button -> token, your user ID, optional alert channel. Commands: `/status /start /stop /rejoin /startall /stopall`.
 
 ## Develop

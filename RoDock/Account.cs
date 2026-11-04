@@ -23,7 +23,8 @@ public class Account : INotifyPropertyChanged
     long? _placeId;
     bool _running;
     Kind _kind;
-    string? _avatar, _gameName, _gameIcon;
+    string? _avatar, _gameName, _gameIcon, _gameThumb;
+    bool _selected;
 
     public string Name { get => _name; set => Set(ref _name, value); }
     public string Cookie { get => _cookie; set => Set(ref _cookie, value); }
@@ -32,11 +33,25 @@ public class Account : INotifyPropertyChanged
     public string PrivateServerLink { get => _link; set => Set(ref _link, value ?? ""); }
 
     [JsonIgnore] public string Status { get => _status; private set => Set(ref _status, value); }
-    [JsonIgnore] public Kind StatusKind { get => _kind; private set => Set(ref _kind, value); }
+    [JsonIgnore] public Kind StatusKind
+    {
+        get => _kind;
+        private set
+        {
+            if (_kind == value) return;
+            Set(ref _kind, value);
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Label)));
+        }
+    }
+
+    /// Short state for chips on the dashboard; Status has the full text.
+    [JsonIgnore] public string Label => _kind switch { Kind.Good => "In game", Kind.Working => "Launching", Kind.Warn => "Retrying", Kind.Bad => "Needs attention", _ => "Stopped" };
     [JsonIgnore] public bool Running { get => _running; set => Set(ref _running, value); }
     [JsonIgnore] public string? AvatarUrl { get => _avatar; set => Set(ref _avatar, value); }
     [JsonIgnore] public string? GameName { get => _gameName; set => Set(ref _gameName, value); }
     [JsonIgnore] public string? GameIcon { get => _gameIcon; set => Set(ref _gameIcon, value); }
+    [JsonIgnore] public string? GameThumb { get => _gameThumb; set => Set(ref _gameThumb, value); }
+    [JsonIgnore] public bool Selected { get => _selected; set => Set(ref _selected, value); }
 
     /// Roblox client processes we started for this account (not saved).
     [JsonIgnore] public int[] Pids = [];

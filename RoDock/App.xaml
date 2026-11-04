@@ -4,46 +4,301 @@
              StartupUri="MainWindow.xaml"
              ThemeMode="Dark">
     <Application.Resources>
-        <!-- Palette: change these to restyle the whole app -->
-        <SolidColorBrush x:Key="Bg" Color="#0F1117" />
-        <SolidColorBrush x:Key="Card" Color="#181B24" />
-        <SolidColorBrush x:Key="CardHi" Color="#232838" />
-        <SolidColorBrush x:Key="Text" Color="#E8EAF0" />
-        <SolidColorBrush x:Key="Muted" Color="#8A90A2" />
-        <SolidColorBrush x:Key="Accent" Color="#6C7BFF" />
-        <SolidColorBrush x:Key="Good" Color="#3DD68C" />
-        <SolidColorBrush x:Key="Warn" Color="#F5B94A" />
+        <!-- Palette. These are only the starting values: Themes.Apply replaces them from the chosen theme (5 base colours, the rest derived). -->
+        <SolidColorBrush x:Key="TextSoft" Color="#29F4F8FF" />
+        <SolidColorBrush x:Key="TextEdge" Color="#59F4F8FF" />
+        <SolidColorBrush x:Key="TextFaint" Color="#1AF4F8FF" />
+        <SolidColorBrush x:Key="Line" Color="#24F4F8FF" />
+        <SolidColorBrush x:Key="AccentSoft" Color="#2E8CC4FF" />
+        <SolidColorBrush x:Key="AccentFill" Color="#338CC4FF" />
+        <SolidColorBrush x:Key="DeepDim" Color="#A61E3552" />
+        <SolidColorBrush x:Key="DeepOverlay" Color="#F21E3552" />
+        <SolidColorBrush x:Key="Bg" Color="#3A5878" />
+        <SolidColorBrush x:Key="Card" Color="#2B4666" />
+        <SolidColorBrush x:Key="Deep" Color="#1E3552" />
+        <SolidColorBrush x:Key="CardHi" Color="#4A6E96" />
+        <SolidColorBrush x:Key="BarDim" Color="#6F9BCB" />
+        <SolidColorBrush x:Key="Scrim" Color="#D10F2238" />
+        <SolidColorBrush x:Key="Text" Color="#F4F8FF" />
+        <SolidColorBrush x:Key="Muted" Color="#C7D8EE" />
+        <SolidColorBrush x:Key="Accent" Color="#8CC4FF" />
+        <SolidColorBrush x:Key="Ink" Color="#0F2238" />
+        <SolidColorBrush x:Key="Idle" Color="#9AA9BC" />
+        <SolidColorBrush x:Key="Good" Color="#4ADE80" />
+        <SolidColorBrush x:Key="Warn" Color="#FBBF24" />
         <SolidColorBrush x:Key="Bad" Color="#FF6B6B" />
+        <BooleanToVisibilityConverter x:Key="BoolVis" />
+
+        <!-- Icons (24x24 grid) -->
+        <StreamGeometry x:Key="IconPlay">M7,4.5 L7,19.5 L20,12 Z</StreamGeometry>
+        <StreamGeometry x:Key="IconStop">M6,6 L18,6 L18,18 L6,18 Z</StreamGeometry>
+        <StreamGeometry x:Key="IconPlus">M12,5 L12,19 M5,12 L19,12</StreamGeometry>
+        <StreamGeometry x:Key="IconGrid">M4,4 L11,4 L11,11 L4,11 Z M13,4 L20,4 L20,11 L13,11 Z M4,13 L11,13 L11,20 L4,20 Z M13,13 L20,13 L20,20 L13,20 Z</StreamGeometry>
+        <StreamGeometry x:Key="IconList">M4,7 L20,7 M4,12 L20,12 M4,17 L20,17</StreamGeometry>
+        <StreamGeometry x:Key="IconRefresh">M20,11 A8,8 0 1 0 17.7,16.7 M20,4 L20,11 L13,11</StreamGeometry>
+        <StreamGeometry x:Key="IconChat">M21,12 A8,8 0 0 1 9.4,19.1 L4,20.5 L5.5,15.9 A8,8 0 1 1 21,12 Z</StreamGeometry>
+        <StreamGeometry x:Key="IconSliders">M4,7 L14,7 M18,7 L20,7 M4,17 L6,17 M10,17 L20,17 M14,7 A2,2 0 1 0 18,7 A2,2 0 1 0 14,7 M6,17 A2,2 0 1 0 10,17 A2,2 0 1 0 6,17</StreamGeometry>
+        <StreamGeometry x:Key="IconLock">M5,11 L19,11 L19,20 L5,20 Z M8,11 L8,8 A4,4 0 0 1 16,8 L16,11</StreamGeometry>
+        <StreamGeometry x:Key="IconLogo">M3,19 L21,19 M5,5 L10,5 L10,14 L5,14 Z M14,9 L19,9 L19,14 L14,14 Z</StreamGeometry>
+        <StreamGeometry x:Key="IconLogin">M15,3 L19,3 A2,2 0 0 1 21,5 L21,19 A2,2 0 0 1 19,21 L15,21 M10,17 L15,12 L10,7 M15,12 L3,12</StreamGeometry>
+        <StreamGeometry x:Key="IconUser">M8,8 A4,4 0 1 0 16,8 A4,4 0 1 0 8,8 M4,21 A8,8 0 0 1 20,21</StreamGeometry>
+        <StreamGeometry x:Key="IconPalette">M12,3 A9,9 0 1 0 12,21 C13.6,21 14.2,19.8 13.6,18.6 C13,17.4 13.7,16.5 15,16.5 L17,16.5 A4,4 0 0 0 21,12.5 C21,7.5 17,3 12,3 Z M7.5,11 L7.6,11 M10,7.5 L10.1,7.5 M14.5,7.5 L14.6,7.5</StreamGeometry>
+        <StreamGeometry x:Key="IconPin">M12,21 C12,21 19,15 19,9.5 A7,7 0 0 0 5,9.5 C5,15 12,21 12,21 Z M9.5,9.5 A2.5,2.5 0 1 0 14.5,9.5 A2.5,2.5 0 1 0 9.5,9.5</StreamGeometry>
+
+        <!-- Icons take their colour from the button they sit in -->
+        <Style x:Key="Icon" TargetType="Path">
+            <Setter Property="Width" Value="20" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Control}}" />
+            <Setter Property="StrokeThickness" Value="2" />
+            <Setter Property="StrokeLineJoin" Value="Round" />
+            <Setter Property="StrokeStartLineCap" Value="Round" />
+            <Setter Property="StrokeEndLineCap" Value="Round" />
+        </Style>
+        <Style x:Key="IconFill" TargetType="Path">
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="Fill" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Control}}" />
+        </Style>
+        <!-- Play triangle, or stop square while Account.Running -->
+        <Style x:Key="RunGlyph" TargetType="Path" BasedOn="{StaticResource IconFill}">
+            <Setter Property="Width" Value="14" />
+            <Setter Property="Height" Value="14" />
+            <Setter Property="Data" Value="{StaticResource IconPlay}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Running}" Value="True"><Setter Property="Data" Value="{StaticResource IconStop}" /></DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="H" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
 
         <Style x:Key="Dot" TargetType="Ellipse">
             <Setter Property="Width" Value="8" />
             <Setter Property="Height" Value="8" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Fill" Value="{StaticResource Muted}" />
+            <Setter Property="Fill" Value="{DynamicResource Idle}" />
             <Style.Triggers>
-                <DataTrigger Binding="{Binding StatusKind}" Value="Working"><Setter Property="Fill" Value="{StaticResource Accent}" /></DataTrigger>
+                <DataTrigger Binding="{Binding StatusKind}" Value="Working"><Setter Property="Fill" Value="{StaticResource Warn}" /></DataTrigger>
                 <DataTrigger Binding="{Binding StatusKind}" Value="Good"><Setter Property="Fill" Value="{StaticResource Good}" /></DataTrigger>
-                <DataTrigger Binding="{Binding StatusKind}" Value="Warn"><Setter Property="Fill" Value="{StaticResource Warn}" /></DataTrigger>
+                <DataTrigger Binding="{Binding StatusKind}" Value="Warn"><Setter Property="Fill" Value="{StaticResource Bad}" /></DataTrigger>
                 <DataTrigger Binding="{Binding StatusKind}" Value="Bad"><Setter Property="Fill" Value="{StaticResource Bad}" /></DataTrigger>
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Background" Value="{StaticResource Accent}" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="Padding" Value="16,6" />
+        <!-- Pill buttons -->
+        <ControlTemplate x:Key="PillTemplate" TargetType="Button">
+            <Border x:Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="23" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="bd" Property="Opacity" Value="0.88" /></Trigger>
+                <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource Text}" /></Trigger>
+                <Trigger Property="IsEnabled" Value="False"><Setter TargetName="bd" Property="Opacity" Value="0.45" /></Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <Style TargetType="Button">
+            <Setter Property="Template" Value="{StaticResource PillTemplate}" />
+            <Setter Property="Background" Value="{DynamicResource TextSoft}" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="Padding" Value="18,0" />
+            <Setter Property="Height" Value="46" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
         </Style>
 
-        <!-- Start/Stop button: text and colour follow Account.Running -->
+        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{DynamicResource Text}" />
+            <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+        </Style>
+
+        <Style x:Key="GhostButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TextEdge}" />
+        </Style>
+
+        <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{DynamicResource Accent}" />
+            <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+        </Style>
+
+        <!-- Start/Stop button: text follows Account.Running -->
         <Style x:Key="RunButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
             <Setter Property="Content" Value="Start" />
             <Style.Triggers>
+                <DataTrigger Binding="{Binding Running}" Value="True"><Setter Property="Content" Value="Stop" /></DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Round play/stop button on a dock tile -->
+        <Style x:Key="TileRun" TargetType="Button">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Background" Value="{DynamicResource Text}" />
+            <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid Background="Transparent">
+                            <Ellipse x:Name="bg" Width="36" Height="36" Fill="{TemplateBinding Background}" />
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="bg" Property="Opacity" Value="0.85" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
                 <DataTrigger Binding="{Binding Running}" Value="True">
-                    <Setter Property="Content" Value="Stop" />
-                    <Setter Property="Background" Value="{StaticResource CardHi}" />
-                    <Setter Property="Foreground" Value="{StaticResource Text}" />
+                    <Setter Property="Background" Value="{DynamicResource Scrim}" />
+                    <Setter Property="Foreground" Value="{DynamicResource Text}" />
                 </DataTrigger>
             </Style.Triggers>
+        </Style>
+
+        <!-- Left rail -->
+        <Style x:Key="RailRadio" TargetType="RadioButton">
+            <Setter Property="Width" Value="48" />
+            <Setter Property="Height" Value="48" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="bd" CornerRadius="16" Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource AccentSoft}" />
+                                <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="bd" Property="Opacity" Value="0.85" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RailToggle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="48" />
+            <Setter Property="Height" Value="48" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="bd" CornerRadius="16" Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource AccentSoft}" />
+                                <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="bd" Property="Opacity" Value="0.85" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="AddRail" TargetType="Button">
+            <Setter Property="Width" Value="48" />
+            <Setter Property="Height" Value="48" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid Background="Transparent">
+                            <Rectangle RadiusX="16" RadiusY="16" Stroke="{DynamicResource Accent}" StrokeThickness="2" StrokeDashArray="3 2" Opacity="0.7" />
+                            <Ellipse Width="28" Height="28" Fill="{DynamicResource Accent}" />
+                            <Path Data="{StaticResource IconPlus}" Width="14" Height="14" Stretch="Uniform" Stroke="{DynamicResource Ink}" StrokeThickness="3"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter Property="Opacity" Value="0.85" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RailSoft" TargetType="Button">
+            <Setter Property="Width" Value="48" />
+            <Setter Property="Height" Value="48" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" CornerRadius="16" Background="{DynamicResource TextFaint}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="bd" Property="Opacity" Value="0.8" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="GearToggle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Grid Background="Transparent">
+                            <Ellipse x:Name="bg" Width="34" Height="34" Fill="{DynamicResource Scrim}" />
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bg" Property="Fill" Value="{DynamicResource Accent}" />
+                                <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="bg" Property="Opacity" Value="0.85" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Checkbox drawn as an on/off switch -->
+        <Style x:Key="SwitchBox" TargetType="CheckBox">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Width="46" Height="26" Background="Transparent">
+                            <Border x:Name="track" CornerRadius="13" Background="{DynamicResource CardHi}" />
+                            <Ellipse x:Name="thumb" Width="20" Height="20" HorizontalAlignment="Left" Margin="3,0,0,0" Fill="{DynamicResource Text}" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="track" Property="Background" Value="{DynamicResource Accent}" />
+                                <Setter TargetName="thumb" Property="HorizontalAlignment" Value="Right" />
+                                <Setter TargetName="thumb" Property="Margin" Value="0,0,3,0" />
+                                <Setter TargetName="thumb" Property="Fill" Value="{DynamicResource Ink}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Application.Resources>
 </Application>

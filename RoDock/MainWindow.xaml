@@ -1,159 +1,549 @@
 <Window x:Class="RoDock.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="RoDock" Width="1000" Height="640" MinWidth="620" MinHeight="420"
-        Background="{StaticResource Bg}" Foreground="{StaticResource Text}">
-    <Grid Margin="24,20,24,16">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+        xmlns:local="clr-namespace:RoDock"
+        Title="RoDock" Width="1280" Height="860" MinWidth="1100" MinHeight="640"
+        Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}"
+        FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="14">
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="72" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="84" />
+        </Grid.ColumnDefinitions>
 
-        <!-- Top bar -->
-        <DockPanel Margin="0,0,0,16">
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                <CheckBox x:Name="MultiBox" Content="Multi-instance" Margin="0,0,16,0" VerticalAlignment="Center"
-                          Checked="Multi_Changed" Unchecked="Multi_Changed" />
-                <CheckBox x:Name="SimpleBox" Content="Simple mode" Margin="0,0,16,0" VerticalAlignment="Center"
-                          Checked="Mode_Changed" Unchecked="Mode_Changed" />
-                <Button Content="Discord" Click="ToggleDiscord_Click" Margin="0,0,8,0" Padding="14,6" />
-                <Button Content="Stop all" Click="StopAll_Click" Margin="0,0,8,0" Padding="14,6" />
-                <Button Content="Start all" Click="StartAll_Click" Margin="0,0,8,0" Padding="14,6" />
-                <Button Content="+ Add account" Click="ToggleAdd_Click" Style="{StaticResource PrimaryButton}" />
-            </StackPanel>
-            <StackPanel VerticalAlignment="Center">
-                <TextBlock x:Name="TitleText" Text="RoDock" FontSize="24" FontWeight="SemiBold" />
-                <TextBlock x:Name="Subtitle" Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
-            </StackPanel>
-        </DockPanel>
-
-        <!-- Add account panel -->
-        <StackPanel Grid.Row="1">
-            <Border x:Name="AddPanel" Visibility="Collapsed" Background="{StaticResource Card}" CornerRadius="12" Padding="16" Margin="0,0,0,16">
-                <StackPanel>
-                    <Button Content="Log in with Roblox..." Click="Login_Click" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" />
-                    <TextBlock Text="or paste the .ROBLOSECURITY cookie of the account" Foreground="{StaticResource Muted}" Margin="0,14,0,8" />
-                    <DockPanel>
-                        <Button DockPanel.Dock="Right" Content="Add" Click="Add_Click" Style="{StaticResource PrimaryButton}" Margin="10,0,0,0" />
-                        <PasswordBox x:Name="CookieBox" />
-                    </DockPanel>
+        <!-- Left rail: view switch + add -->
+        <Border Background="{DynamicResource Deep}" CornerRadius="28" Padding="0,18">
+            <DockPanel>
+                <Button DockPanel.Dock="Bottom" Style="{StaticResource AddRail}" ToolTip="Add account" Click="ToggleAdd_Click" HorizontalAlignment="Center" />
+                <StackPanel HorizontalAlignment="Center">
+                    <Border Width="40" Height="40" CornerRadius="12" Background="{DynamicResource Text}" Margin="0,0,0,14">
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource IconLogo}" Stroke="{DynamicResource Deep}" StrokeThickness="2.4" />
+                    </Border>
+                    <RadioButton x:Name="CardsRadio" Style="{StaticResource RailRadio}" ToolTip="Dashboard" IsChecked="True" Checked="Mode_Changed">
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource IconGrid}" />
+                    </RadioButton>
+                    <RadioButton x:Name="ListRadio" Style="{StaticResource RailRadio}" ToolTip="Simple list" Checked="Mode_Changed">
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource IconList}" />
+                    </RadioButton>
+                    <ToggleButton x:Name="ThemeToggle" Style="{StaticResource RailToggle}" ToolTip="Themes and colours">
+                        <Path Style="{StaticResource Icon}" Data="{StaticResource IconPalette}" />
+                    </ToggleButton>
                 </StackPanel>
-            </Border>
+            </DockPanel>
+        </Border>
 
-            <Border x:Name="DiscordPanel" Visibility="Collapsed" Background="{StaticResource Card}" CornerRadius="12" Padding="16" Margin="0,0,0,16">
-                <StackPanel>
-                    <TextBlock Text="Discord bot: remote control (/status /start /stop /rejoin /startall /stopall) and alerts" Foreground="{StaticResource Muted}" Margin="0,0,0,10" />
-                    <TextBlock Text="Bot token (leave empty to keep the saved one)" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,4" />
-                    <PasswordBox x:Name="TokenBox" />
-                    <Grid Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="10" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="Your Discord user ID (only you can use commands)" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,4" />
-                            <TextBox x:Name="UserIdBox" />
+        <!-- Center -->
+        <Grid Grid.Column="1" Margin="16,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Top bar -->
+            <DockPanel Height="52" Margin="0,0,0,16">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="UpdateToast" Visibility="Collapsed" Style="{StaticResource AccentButton}" Click="Update_Click" Margin="0,0,12,0"
+                            ToolTip="Running accounts are restarted automatically.">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Style="{StaticResource Icon}" Data="M12,19 L12,5 M5,12 L12,5 L19,12" Width="18" Height="18" StrokeThickness="2.6" Margin="0,0,8,0" />
+                            <TextBlock x:Name="UpdateText" VerticalAlignment="Center" />
                         </StackPanel>
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="Alert channel ID (optional)" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,4" />
-                            <TextBox x:Name="ChannelIdBox" />
-                        </StackPanel>
-                    </Grid>
-                    <Button Content="Save &amp; connect" Click="SaveDiscord_Click" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Margin="0,12,0,0" />
+                    </Button>
+                    <Button Content="Stop all" Style="{StaticResource GhostButton}" Click="StopAll_Click" Margin="0,0,12,0" />
+                    <Button Content="Start all" Style="{StaticResource PrimaryButton}" Click="StartAll_Click" />
                 </StackPanel>
-            </Border>
-        </StackPanel>
+                <TextBlock x:Name="TitleText" FontSize="30" FontWeight="SemiBold" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+                    <Run x:Name="GreetRun" /><Run x:Name="CountRun" FontWeight="Bold" Foreground="{DynamicResource Text}" />
+                </TextBlock>
+            </DockPanel>
 
-        <!-- Full mode: cards -->
-        <ScrollViewer x:Name="FullView" Grid.Row="2" VerticalScrollBarVisibility="Auto">
-            <ItemsControl x:Name="Cards">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Width="330" Margin="0,0,16,16" Padding="18" CornerRadius="16" Background="{StaticResource Card}">
-                            <StackPanel>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <Grid Width="56" Height="56">
-                                        <Ellipse Fill="{StaticResource CardHi}" />
-                                        <Ellipse>
-                                            <Ellipse.Fill><ImageBrush ImageSource="{Binding AvatarUrl}" Stretch="UniformToFill" /></Ellipse.Fill>
-                                        </Ellipse>
-                                    </Grid>
-                                    <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Name}" FontSize="17" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                        <DockPanel Margin="0,5,0,0">
-                                            <Ellipse Style="{StaticResource Dot}" DockPanel.Dock="Left" VerticalAlignment="Top" Margin="0,4,0,0" />
-                                            <TextBlock Text="{Binding Status}" Foreground="{StaticResource Muted}" Margin="7,0,0,0" FontSize="12"
-                                                       TextWrapping="Wrap" MaxHeight="34" ToolTip="{Binding Status}" />
-                                        </DockPanel>
+            <!-- Add account / Discord panels -->
+            <StackPanel Grid.Row="1">
+                <Border x:Name="ThemePanel" Background="{DynamicResource Card}" CornerRadius="24" Padding="20" Margin="0,0,0,16"
+                        Visibility="{Binding IsChecked, ElementName=ThemeToggle, Converter={StaticResource BoolVis}}">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,12">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button x:Name="ThemeReset" Content="Reset" Style="{StaticResource GhostButton}" Height="38" Click="ThemeReset_Click" Margin="0,0,8,0"
+                                        ToolTip="Put this built-in theme back to its original colours" />
+                                <Button x:Name="ThemeDelete" Content="Delete" Style="{StaticResource GhostButton}" Height="38" Click="ThemeDelete_Click" Margin="0,0,8,0"
+                                        ToolTip="Delete this theme (built-in themes can only be reset)" />
+                                <Button Content="New theme" Style="{StaticResource AccentButton}" Height="38" Click="ThemeNew_Click" ToolTip="Copy the current colours into a new theme" />
+                            </StackPanel>
+                            <TextBlock Text="Theme" Style="{StaticResource H}" VerticalAlignment="Center" />
+                        </DockPanel>
+                        <ItemsControl x:Name="ThemeList">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Click="ThemePick_Click" Height="40" Margin="0,0,8,8" Padding="14,0,16,0">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Selected}" Value="True">
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                                        <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Ellipse Width="16" Height="16" Fill="{Binding A}" />
+                                            <Ellipse Width="16" Height="16" Fill="{Binding B}" Margin="-5,0,0,0" />
+                                            <Ellipse Width="16" Height="16" Fill="{Binding C}" Margin="-5,0,8,0" />
+                                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="Colours of the selected theme (click one to change it)" Foreground="{DynamicResource Muted}" FontSize="12" Margin="0,8,0,6" />
+                        <ItemsControl x:Name="Slots">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,0,16,0">
+                                        <TextBlock Text="{Binding Label}" Foreground="{DynamicResource Muted}" FontSize="12" Margin="4,0,0,4" />
+                                        <Button Click="Slot_Click" Width="132" Height="40" Background="{Binding Fill}" Foreground="{Binding Ink}" BorderBrush="{DynamicResource TextEdge}" Padding="0">
+                                            <TextBlock Text="{Binding Hex}" FontFamily="Consolas" />
+                                        </Button>
                                     </StackPanel>
-                                    <Button Grid.Column="2" Style="{StaticResource RunButton}" Click="Toggle_Click" VerticalAlignment="Center" MinWidth="64" />
-                                </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Popup x:Name="PickerPop" StaysOpen="False" AllowsTransparency="True" Placement="Bottom" Closed="PickerPop_Closed">
+                            <Border Background="{DynamicResource Deep}" BorderBrush="{DynamicResource TextEdge}" BorderThickness="1" CornerRadius="20" Padding="16" Margin="0,6,0,0">
+                                <local:ColorPicker x:Name="Picker" />
+                            </Border>
+                        </Popup>
+                    </StackPanel>
+                </Border>
 
-                                <Border Background="{StaticResource CardHi}" CornerRadius="10" Padding="10" Margin="0,16,0,0">
+                <Border x:Name="AddPanel" Visibility="Collapsed" Background="{DynamicResource Card}" CornerRadius="24" Padding="20" Margin="0,0,0,16">
+                    <StackPanel>
+                        <Button Content="Log in with Roblox..." Click="Login_Click" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" />
+                        <TextBlock Text="or paste the .ROBLOSECURITY cookie of the account" Foreground="{DynamicResource Muted}" Margin="0,14,0,8" />
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Add" Click="Add_Click" Style="{StaticResource AccentButton}" Margin="10,0,0,0" />
+                            <PasswordBox x:Name="CookieBox" VerticalContentAlignment="Center" Height="46" />
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="DiscordPanel" Visibility="Collapsed" Background="{DynamicResource Card}" CornerRadius="24" Padding="20" Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="Discord bot: remote control (/status /start /stop /rejoin /startall /stopall) and alerts" Foreground="{DynamicResource Muted}" Margin="0,0,0,10" />
+                        <TextBlock Text="Bot token (leave empty to keep the saved one)" Foreground="{DynamicResource Muted}" FontSize="12" Margin="0,0,0,4" />
+                        <PasswordBox x:Name="TokenBox" />
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="10" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Your Discord user ID (only you can use commands)" Foreground="{DynamicResource Muted}" FontSize="12" Margin="0,0,0,4" />
+                                <TextBox x:Name="UserIdBox" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Alert channel ID (optional)" Foreground="{DynamicResource Muted}" FontSize="12" Margin="0,0,0,4" />
+                                <TextBox x:Name="ChannelIdBox" />
+                            </StackPanel>
+                        </Grid>
+                        <Button Content="Save &amp; connect" Click="SaveDiscord_Click" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Margin="0,12,0,0" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- Dashboard -->
+            <ScrollViewer x:Name="DashView" Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="0,0,8,0">
+
+                    <!-- Selected account + activity -->
+                    <Grid Height="228" Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="332" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border x:Name="Hero" Margin="0,0,16,0" CornerRadius="28" Background="{DynamicResource Deep}">
+                            <Grid>
+                                <Border HorizontalAlignment="Right" Width="440" CornerRadius="0,28,28,0">
+                                    <Border.Background><ImageBrush ImageSource="{Binding GameThumb}" Stretch="UniformToFill" /></Border.Background>
+                                    <Border.OpacityMask>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <GradientStop Color="#00000000" Offset="0" />
+                                            <GradientStop Color="#FF000000" Offset="0.45" />
+                                        </LinearGradientBrush>
+                                    </Border.OpacityMask>
+                                </Border>
+
+                                <StackPanel Margin="28,18" HorizontalAlignment="Left" Width="380">
                                     <StackPanel Orientation="Horizontal">
-                                        <Border Width="36" Height="36" CornerRadius="8">
-                                            <Border.Background><ImageBrush ImageSource="{Binding GameIcon}" Stretch="UniformToFill" /></Border.Background>
+                                        <Border Height="30" CornerRadius="15" Padding="12,0" Background="{DynamicResource TextSoft}">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Ellipse Style="{StaticResource Dot}" Margin="0,0,8,0" />
+                                                <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
+                                            </StackPanel>
                                         </Border>
-                                        <TextBlock Text="{Binding GameName, TargetNullValue='No game set'}" VerticalAlignment="Center" Margin="12,0,0,0"
-                                                   TextTrimming="CharacterEllipsis" MaxWidth="220" />
+                                        <Border Height="30" CornerRadius="15" Padding="12,0" Margin="8,0,0,0" Background="{DynamicResource TextSoft}">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding PrivateServerLink}" Value=""><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Path Style="{StaticResource Icon}" Data="{StaticResource IconLock}" Width="13" Height="13" Margin="0,0,7,0" />
+                                                <TextBlock Text="Private server" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Name}" FontSize="34" FontWeight="Bold" Margin="0,6,0,0" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding GameName, TargetNullValue='No game set'}" FontSize="16" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Status}" FontSize="13" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" MaxHeight="34" Margin="0,4,0,0" ToolTip="{Binding Status}" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                        <Button Style="{StaticResource RunButton}" Click="Toggle_Click" MinWidth="110" Margin="0,0,10,0" />
+                                        <Button Click="Rejoin_Click">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Running}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Path Style="{StaticResource Icon}" Data="{StaticResource IconRefresh}" Width="18" Height="18" Margin="0,0,8,0" />
+                                                <TextBlock Text="Rejoin" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- Settings of the selected account -->
+                                <Border x:Name="HeroSettings" CornerRadius="28" Background="{DynamicResource DeepOverlay}" Padding="28,22"
+                                        Visibility="{Binding IsChecked, ElementName=HeroGear, Converter={StaticResource BoolVis}}">
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource H}" Margin="0,0,52,14"><Run Text="Settings for " /><Run Text="{Binding Name, Mode=OneWay}" /></TextBlock>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="170" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="Place ID" Foreground="{DynamicResource Muted}" FontSize="12" Margin="0,0,0,4" />
+                                                <TextBox Text="{Binding PlaceId, TargetNullValue='', UpdateSourceTrigger=LostFocus}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Private server link (optional)" Foreground="{DynamicResource Muted}" FontSize="12" Margin="0,0,0,4" />
+                                                <TextBox Text="{Binding PrivateServerLink, UpdateSourceTrigger=LostFocus}" />
+                                            </StackPanel>
+                                        </Grid>
+                                        <Button Content="Remove account" Click="Remove_Click" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Margin="0,18,0,0" />
                                     </StackPanel>
                                 </Border>
 
-                                <Expander Header="Settings" Margin="0,10,0,0" Foreground="{StaticResource Muted}">
-                                    <StackPanel Margin="0,8,0,0">
-                                        <TextBlock Text="Place ID" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,4" />
-                                        <TextBox Text="{Binding PlaceId, TargetNullValue='', UpdateSourceTrigger=LostFocus}" />
-                                        <TextBlock Text="Private server link (optional)" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,10,0,4" />
-                                        <TextBox Text="{Binding PrivateServerLink, UpdateSourceTrigger=LostFocus}" />
-                                        <Button Content="Remove account" Click="Remove_Click" Margin="0,12,0,0" HorizontalAlignment="Left" />
-                                    </StackPanel>
-                                </Expander>
-                            </StackPanel>
+                                <ToggleButton x:Name="HeroGear" Style="{StaticResource GearToggle}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,10,0" ToolTip="Account settings">
+                                    <Path Style="{StaticResource Icon}" Data="{StaticResource IconSliders}" Width="18" Height="18" />
+                                </ToggleButton>
+                            </Grid>
                         </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
 
-        <!-- Simple mode: plain list -->
-        <DataGrid x:Name="SimpleView" Grid.Row="2" Visibility="Collapsed" AutoGenerateColumns="False" CanUserAddRows="False"
-                  SelectionMode="Extended" HeadersVisibility="Column" GridLinesVisibility="Horizontal">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Account" Binding="{Binding Name}" IsReadOnly="True" Width="150" />
-                <DataGridTextColumn Header="Place ID" Binding="{Binding PlaceId, TargetNullValue=''}" Width="130" />
-                <DataGridTextColumn Header="Private server link" Binding="{Binding PrivateServerLink}" Width="*" />
-                <DataGridTextColumn Header="Status" Binding="{Binding Status, Mode=OneWay}" IsReadOnly="True" Width="240" />
-            </DataGrid.Columns>
-        </DataGrid>
+                        <Border Grid.Column="1" Background="{DynamicResource Card}" CornerRadius="28" Padding="20,16">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Top" Text="Activity" Style="{StaticResource H}" Margin="0,0,0,8" />
+                                <TextBlock x:Name="FeedEmpty" DockPanel.Dock="Top" Text="Status changes show up here once an account starts." Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                <ItemsControl x:Name="Feed" ClipToBounds="True">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Height="34">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                <Ellipse Style="{StaticResource Dot}" Width="10" Height="10" Margin="0,0,12,0" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Text}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip="{Binding Text}" />
+                                                <TextBlock Grid.Column="2" Text="{Binding Time}" Foreground="{DynamicResource Muted}" FontSize="13" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </DockPanel>
+                        </Border>
+                    </Grid>
 
-        <!-- Footer -->
-        <DockPanel Grid.Row="3" Margin="0,12,0,0">
-            <StackPanel x:Name="SimpleActions" DockPanel.Dock="Right" Orientation="Horizontal" Visibility="Collapsed">
-                <Button Content="Start selected" Click="StartSelected_Click" Margin="0,0,8,0" />
-                <Button Content="Stop selected" Click="StopSelected_Click" Margin="0,0,8,0" />
-                <Button Content="Remove selected" Click="RemoveSelected_Click" />
-            </StackPanel>
-            <TextBlock x:Name="Message" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-        </DockPanel>
+                    <!-- Docks -->
+                    <DockPanel Margin="0,0,0,10">
+                        <TextBlock x:Name="DockCount" DockPanel.Dock="Right" Foreground="{DynamicResource Muted}" VerticalAlignment="Bottom" />
+                        <TextBlock Text="Your docks" FontSize="22" FontWeight="Bold" />
+                    </DockPanel>
+                    <ItemsControl x:Name="Cards">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Width="196" Height="156" Margin="0,0,16,16" CornerRadius="24" Background="{DynamicResource Deep}" BorderThickness="3"
+                                        MouseLeftButtonUp="Select_Click" Cursor="Hand">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="BorderBrush" Value="Transparent" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Selected}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource Accent}" /></DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <Grid>
+                                        <Border CornerRadius="21">
+                                            <Border.Background><ImageBrush ImageSource="{Binding GameThumb}" Stretch="UniformToFill" /></Border.Background>
+                                        </Border>
+                                        <!-- Stopped tiles are dimmed -->
+                                        <Border CornerRadius="21" Background="{DynamicResource DeepDim}">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Running}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                        </Border>
+                                        <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10" Height="26" CornerRadius="13" Padding="9,0,11,0" Background="{DynamicResource Scrim}">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Ellipse Style="{StaticResource Dot}" Margin="0,0,7,0" />
+                                                <TextBlock Text="{Binding Label}" FontSize="12.5" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                        </Border>
+                                        <Button Style="{StaticResource TileRun}" Click="Toggle_Click" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,2,0">
+                                            <Path Style="{StaticResource RunGlyph}" />
+                                        </Button>
+                                        <Border VerticalAlignment="Bottom" Height="50" Padding="14,0" CornerRadius="0,0,21,21" Background="{DynamicResource Scrim}">
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding GameName, TargetNullValue='No game set'}" FontSize="12.5" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
-        <!-- Update notice (bottom-right corner) -->
-        <Border x:Name="UpdateToast" Grid.RowSpan="4" Visibility="Collapsed" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,0,44"
-                Background="{StaticResource Card}" BorderBrush="{StaticResource Accent}" BorderThickness="1" CornerRadius="12" Padding="16,12">
-            <StackPanel>
-                <TextBlock x:Name="UpdateText" FontWeight="SemiBold" />
-                <TextBlock Text="Running accounts are restarted automatically." Foreground="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" />
-                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                    <Button x:Name="UpdateButton" Content="Update &amp; restart" Click="Update_Click" Style="{StaticResource PrimaryButton}" />
-                    <Button Content="Later" Click="DismissUpdate_Click" Margin="8,0,0,0" />
+                    <!-- Charts -->
+                    <Grid Height="232">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="270" />
+                            <ColumnDefinition Width="270" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Background="{DynamicResource Card}" CornerRadius="28" Padding="20,16" Margin="0,0,16,0">
+                            <DockPanel>
+                                <DockPanel DockPanel.Dock="Top">
+                                    <TextBlock x:Name="LineNote" DockPanel.Dock="Right" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
+                                    <TextBlock Text="Accounts in game" Style="{StaticResource H}" />
+                                </DockPanel>
+                                <Grid DockPanel.Dock="Bottom" Margin="0,6,0,0">
+                                    <TextBlock Text="24h ago" Foreground="{DynamicResource Muted}" FontSize="11" HorizontalAlignment="Left" />
+                                    <TextBlock Text="12h ago" Foreground="{DynamicResource Muted}" FontSize="11" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Now" Foreground="{DynamicResource Muted}" FontSize="11" HorizontalAlignment="Right" />
+                                </Grid>
+                                <Grid Margin="0,12,0,0">
+                                    <Grid>
+                                        <Grid.RowDefinitions><RowDefinition /><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
+                                        <Border Grid.Row="0" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1" />
+                                        <Border Grid.Row="1" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1" />
+                                        <Border Grid.Row="2" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1" />
+                                    </Grid>
+                                    <Canvas x:Name="LineCanvas" ClipToBounds="True" SizeChanged="Chart_SizeChanged">
+                                        <Polygon x:Name="LineArea" Fill="{DynamicResource AccentFill}" />
+                                        <Polyline x:Name="LineLine" Stroke="{DynamicResource Accent}" StrokeThickness="3" StrokeLineJoin="Round" />
+                                    </Canvas>
+                                </Grid>
+                            </DockPanel>
+                        </Border>
+
+                        <Border Grid.Column="1" Background="{DynamicResource Card}" CornerRadius="28" Padding="20,16" Margin="0,0,16,0">
+                            <DockPanel>
+                                <DockPanel DockPanel.Dock="Top">
+                                    <TextBlock Text="This week" DockPanel.Dock="Right" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
+                                    <TextBlock Text="Rejoins" Style="{StaticResource H}" />
+                                </DockPanel>
+                                <ItemsControl x:Name="Bars" Margin="0,8,0,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                                <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Center">
+                                                    <TextBlock Text="{Binding Value}" HorizontalAlignment="Center" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,3" />
+                                                    <Border Width="22" Height="{Binding Height}" CornerRadius="7" Background="{Binding Fill}" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Row="1" Text="{Binding Label}" Foreground="{DynamicResource Muted}" FontSize="11" HorizontalAlignment="Center" Margin="0,6,0,0" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </DockPanel>
+                        </Border>
+
+                        <Border Grid.Column="2" Background="{DynamicResource Card}" CornerRadius="28" Padding="20,16">
+                            <DockPanel>
+                                <DockPanel DockPanel.Dock="Top">
+                                    <TextBlock Text="7 days" DockPanel.Dock="Right" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
+                                    <TextBlock Text="Hours online" Style="{StaticResource H}" />
+                                </DockPanel>
+                                <ItemsControl x:Name="Legend" DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                    <Ellipse Width="8" Height="8" Fill="{Binding Fill}" Margin="0,0,5,0" />
+                                                    <TextBlock Text="{Binding Hours}" FontWeight="SemiBold" FontSize="13" />
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Muted}" FontSize="12" TextTrimming="CharacterEllipsis" MaxWidth="72" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Grid Width="128" Height="128" VerticalAlignment="Center">
+                                    <Ellipse Width="104" Height="104" Stroke="{DynamicResource Bg}" StrokeThickness="16" />
+                                    <Canvas x:Name="Donut" Width="128" Height="128" />
+                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                        <TextBlock x:Name="DonutTotal" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center" />
+                                        <TextBlock Text="total" Foreground="{DynamicResource Muted}" FontSize="12" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Grid>
+                            </DockPanel>
+                        </Border>
+                    </Grid>
                 </StackPanel>
-            </StackPanel>
-        </Border>
+            </ScrollViewer>
+
+            <!-- First run: no accounts yet -->
+            <Grid x:Name="EmptyView" Grid.Row="2" Visibility="Collapsed">
+                <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <Border Background="{DynamicResource Deep}" CornerRadius="28" Padding="48,0">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Left">
+                        <Border Height="30" CornerRadius="15" Padding="13,0" Background="{DynamicResource AccentSoft}" HorizontalAlignment="Left">
+                            <TextBlock Text="Welcome to RoDock" Foreground="{DynamicResource Accent}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock FontSize="60" FontWeight="Bold" LineHeight="62" LineStackingStrategy="BlockLineHeight" Margin="0,16,0,0">Your alts,<LineBreak />always in game.</TextBlock>
+                        <TextBlock Text="Add an account, pick a game, press Start. RoDock relaunches Roblox the moment it drops and can be controlled from Discord."
+                                   FontSize="18" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" MaxWidth="520" Margin="0,14,0,0" />
+                        <StackPanel Orientation="Horizontal" Margin="0,26,0,0">
+                            <Button Style="{StaticResource PrimaryButton}" Height="54" Padding="26,0" Click="Login_Click" Margin="0,0,12,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Style="{StaticResource Icon}" Data="{StaticResource IconLogin}" StrokeThickness="2.4" Margin="0,0,10,0" />
+                                    <TextBlock Text="Log in with Roblox" FontSize="17" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Content="Paste a cookie" Style="{StaticResource GhostButton}" Height="54" Padding="24,0" FontSize="17" Click="ToggleAdd_Click" />
+                        </StackPanel>
+                        <TextBlock Text="Cookies stay on this PC, encrypted with Windows." Foreground="{DynamicResource Muted}" FontSize="13" Margin="0,18,0,0" />
+                    </StackPanel>
+                </Border>
+                <UniformGrid Grid.Row="1" Rows="1" Margin="0,16,0,0" Height="150">
+                    <Border Background="{DynamicResource Card}" CornerRadius="28" Padding="24,20" Margin="0,0,16,0">
+                        <StackPanel>
+                            <Path Style="{StaticResource Icon}" Data="{StaticResource IconUser}" Stroke="{DynamicResource Accent}" Width="24" Height="24" HorizontalAlignment="Left" />
+                            <TextBlock Text="1. Add an account" Style="{StaticResource H}" Margin="0,10,0,4" />
+                            <TextBlock Text="Log in once. Each account gets its own tile and a spot in the dock." Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                    <Border Background="{DynamicResource Card}" CornerRadius="28" Padding="24,20" Margin="0,0,16,0">
+                        <StackPanel>
+                            <Path Style="{StaticResource Icon}" Data="{StaticResource IconPin}" Stroke="{DynamicResource Accent}" Width="24" Height="24" HorizontalAlignment="Left" />
+                            <TextBlock Text="2. Pick a game" Style="{StaticResource H}" Margin="0,10,0,4" />
+                            <TextBlock Text="Set a Place ID, and a private server link if you want one." Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                    <Border Background="{DynamicResource Card}" CornerRadius="28" Padding="24,20">
+                        <StackPanel>
+                            <Path Style="{StaticResource IconFill}" Data="{StaticResource IconPlay}" Fill="{DynamicResource Accent}" Width="22" Height="22" HorizontalAlignment="Left" />
+                            <TextBlock Text="3. Press Start" Style="{StaticResource H}" Margin="0,10,0,4" />
+                            <TextBlock Text="RoDock launches, waits until you are in game, and relaunches if you drop." Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+            </Grid>
+
+            <!-- Simple mode: plain list -->
+            <DataGrid x:Name="SimpleView" Grid.Row="2" Visibility="Collapsed" AutoGenerateColumns="False" CanUserAddRows="False"
+                      SelectionMode="Extended" HeadersVisibility="Column" GridLinesVisibility="Horizontal">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Account" Binding="{Binding Name}" IsReadOnly="True" Width="150" />
+                    <DataGridTextColumn Header="Place ID" Binding="{Binding PlaceId, TargetNullValue=''}" Width="130" />
+                    <DataGridTextColumn Header="Private server link" Binding="{Binding PrivateServerLink}" Width="*" />
+                    <DataGridTextColumn Header="Status" Binding="{Binding Status, Mode=OneWay}" IsReadOnly="True" Width="240" />
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <!-- Footer -->
+            <DockPanel Grid.Row="3" Margin="0,12,0,0">
+                <StackPanel x:Name="SimpleActions" DockPanel.Dock="Right" Orientation="Horizontal" Visibility="Collapsed">
+                    <Button Content="Start selected" Click="StartSelected_Click" Margin="0,0,8,0" />
+                    <Button Content="Stop selected" Click="StopSelected_Click" Margin="0,0,8,0" />
+                    <Button Content="Remove selected" Click="RemoveSelected_Click" />
+                </StackPanel>
+                <TextBlock x:Name="Message" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+        </Grid>
+
+        <!-- Right rail: the account dock, Discord, multi-instance -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Border Background="{DynamicResource Deep}" CornerRadius="28" Padding="0,18">
+                <DockPanel>
+                    <Path DockPanel.Dock="Top" Style="{StaticResource Icon}" Data="{StaticResource IconUser}" Stroke="{DynamicResource Muted}" Margin="0,0,0,14" HorizontalAlignment="Center" />
+                    <ScrollViewer VerticalScrollBarVisibility="Hidden">
+                        <ItemsControl x:Name="DockList" HorizontalAlignment="Center">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Width="56" Height="56" Margin="0,0,0,14" Background="Transparent" Cursor="Hand" MouseLeftButtonUp="Select_Click" ToolTip="{Binding Name}">
+                                        <Ellipse Fill="{DynamicResource CardHi}" />
+                                        <Ellipse>
+                                            <Ellipse.Fill><ImageBrush ImageSource="{Binding AvatarUrl}" Stretch="UniformToFill" /></Ellipse.Fill>
+                                        </Ellipse>
+                                        <Ellipse StrokeThickness="3">
+                                            <Ellipse.Style>
+                                                <Style TargetType="Ellipse">
+                                                    <Setter Property="Stroke" Value="{DynamicResource Bg}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Selected}" Value="True"><Setter Property="Stroke" Value="{DynamicResource Accent}" /></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Ellipse.Style>
+                                        </Ellipse>
+                                        <Ellipse Style="{StaticResource Dot}" Width="16" Height="16" Stroke="{DynamicResource Deep}" StrokeThickness="3"
+                                                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-2,-2,0" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+            <Border Grid.Row="1" Background="{DynamicResource Deep}" CornerRadius="28" Padding="0,16" Margin="0,16,0,0">
+                <StackPanel HorizontalAlignment="Center">
+                    <Grid Width="48" Height="48" HorizontalAlignment="Center">
+                        <Button Style="{StaticResource RailSoft}" Click="ToggleDiscord_Click" ToolTip="Discord bot">
+                            <Path Style="{StaticResource Icon}" Data="{StaticResource IconChat}" Width="22" Height="22" />
+                        </Button>
+                        <Ellipse x:Name="DiscordDot" Width="14" Height="14" Fill="{DynamicResource Idle}" Stroke="{DynamicResource Deep}" StrokeThickness="3"
+                                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-2,-2,0" IsHitTestVisible="False" />
+                    </Grid>
+                    <CheckBox x:Name="MultiBox" Style="{StaticResource SwitchBox}" Margin="0,12,0,0" HorizontalAlignment="Center"
+                              ToolTip="Multi-instance: lets several Roblox clients run at once" Checked="Multi_Changed" Unchecked="Multi_Changed" />
+                    <TextBlock Text="Multi" Foreground="{DynamicResource Muted}" FontSize="12" HorizontalAlignment="Center" Margin="0,6,0,0" />
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>
