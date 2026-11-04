@@ -10,7 +10,7 @@ namespace RoDock;
 
 /// Resume = user ids of accounts that were running when an update restarted the app; they are started again on the next launch.
 /// ThemeName = the chosen theme; Themes = only the themes that differ from the built-in ones (edited built-ins and the user's own).
-public record Settings(bool Simple = false, bool Multi = true, long[]? Resume = null, string? ThemeName = null, Theme[]? Themes = null);
+public record Settings(bool Simple = false, bool Multi = true, long[]? Resume = null, string? ThemeName = null, Theme[]? Themes = null, bool Animations = true);
 
 public record ThemeChip(string Name, Brush A, Brush B, Brush C, bool Selected);
 public record SlotVm(string Key, string Label, Brush Fill, Brush Ink, string Hex);
@@ -79,7 +79,9 @@ public partial class MainWindow : Window
         ListRadio.IsChecked = s.Simple;
         CardsRadio.IsChecked = !s.Simple;
         MultiBox.IsChecked = _multiWanted = s.Multi;
+        RoDock.Animations.State.On = s.Animations;
         _ready = true;
+        RoDock.Animations.State.PropertyChanged += (_, _) => SaveSettings();
         try { if (Vault.Read<DiscordConfig>(_discordPath) is { } cfg) _ = ConnectDiscord(cfg); }
         catch (Exception ex) { Message.Text = $"Could not read Discord settings: {ex.Message}"; }
         if (s.Multi) ApplyMulti();
@@ -104,6 +106,25 @@ public partial class MainWindow : Window
         _updateTimer.Tick += async (_, _) => await CheckUpdate();
         _updateTimer.Start();
         _ = CheckUpdate(); // also at every launch
+    }
+
+    // ---- title bar (the window has no native one) ----
+
+    void Minimize_Click(object s, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+    void Close_Click(object s, RoutedEventArgs e) => SystemCommands.CloseWindow(this);
+
+    void Maximize_Click(object s, RoutedEventArgs e)
+    {
+        if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this); else SystemCommands.MaximizeWindow(this);
+    }
+
+    void Window_StateChanged(object? s, EventArgs e)
+    {
+        var max = WindowState == WindowState.Maximized;
+        // A maximised window without a native frame overhangs the screen by its resize border; pull the content back in.
+        RootFrame.Margin = max ? SystemParameters.WindowResizeBorderThickness : new Thickness(0);
+        MaxGlyph.Data = Geometry.Parse(max ? "M2.5,2.5 L2.5,0.5 L9.5,0.5 L9.5,7.5 L7.5,7.5 M0.5,2.5 L7.5,2.5 L7.5,9.5 L0.5,9.5 Z" : "M0.5,0.5 L9.5,0.5 L9.5,9.5 L0.5,9.5 Z");
+        MaxButton.ToolTip = max ? "Restore" : "Maximize";
     }
 
     // ---- updates ----
@@ -493,7 +514,7 @@ public partial class MainWindow : Window
 
     void SaveSettings(long[]? resume = null)
     {
-        try { Directory.CreateDirectory(Dir); File.WriteAllText(_settingsPath, JsonSerializer.Serialize(new Settings(ListRadio.IsChecked == true, _multiWanted, resume, _theme.Name, _themes.Where(t => !Themes.Presets.Contains(t)).ToArray()))); }
+        try { Directory.CreateDirectory(Dir); File.WriteAllText(_settingsPath, JsonSerializer.Serialize(new Settings(ListRadio.IsChecked == true, _multiWanted, resume, _theme.Name, _themes.Where(t => !Themes.Presets.Contains(t)).ToArray(), RoDock.Animations.State.On))); }
         catch { } // a lost preference is not worth an error dialog
     }
 }

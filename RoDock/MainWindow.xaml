@@ -4,8 +4,28 @@
         xmlns:local="clr-namespace:RoDock"
         Title="RoDock" Width="1280" Height="860" MinWidth="1100" MinHeight="640"
         Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}"
-        FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="14">
-    <Grid Margin="20">
+        FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="14" StateChanged="Window_StateChanged">
+    <!-- No native title bar: the top 32 px of the window is the drag area, with our own minimise/maximise/close buttons at the right. -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="32" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+    <Grid x:Name="RootFrame">
+    <Grid.RowDefinitions>
+        <RowDefinition Height="32" />
+        <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+        <Button Style="{StaticResource CaptionButton}" Click="Minimize_Click" ToolTip="Minimize" WindowChrome.IsHitTestVisibleInChrome="True">
+            <Path Style="{StaticResource Icon}" Data="M0,5 L10,5" Width="10" Height="10" Stretch="None" StrokeThickness="1.2" />
+        </Button>
+        <Button x:Name="MaxButton" Style="{StaticResource CaptionButton}" Click="Maximize_Click" ToolTip="Maximize" WindowChrome.IsHitTestVisibleInChrome="True">
+            <Path x:Name="MaxGlyph" Style="{StaticResource Icon}" Data="M0.5,0.5 L9.5,0.5 L9.5,9.5 L0.5,9.5 Z" Width="10" Height="10" Stretch="None" StrokeThickness="1.2" />
+        </Button>
+        <Button Style="{StaticResource CaptionClose}" Click="Close_Click" ToolTip="Close" WindowChrome.IsHitTestVisibleInChrome="True">
+            <Path Style="{StaticResource Icon}" Data="M0,0 L10,10 M10,0 L0,10" Width="10" Height="10" Stretch="None" StrokeThickness="1.2" />
+        </Button>
+    </StackPanel>
+    <Grid Grid.Row="1" Margin="20,0,20,20">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="72" />
             <ColumnDefinition Width="*" />
@@ -18,7 +38,7 @@
                 <Button DockPanel.Dock="Bottom" Style="{StaticResource AddRail}" ToolTip="Add account" Click="ToggleAdd_Click" HorizontalAlignment="Center" />
                 <StackPanel HorizontalAlignment="Center">
                     <Border Width="40" Height="40" CornerRadius="12" Background="{DynamicResource Text}" Margin="0,0,0,14">
-                        <Path Style="{StaticResource Icon}" Data="{StaticResource IconLogo}" Stroke="{DynamicResource Deep}" StrokeThickness="2.4" />
+                        <TextBlock Text="RoD" FontSize="15" FontWeight="ExtraBold" Foreground="{DynamicResource Deep}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <RadioButton x:Name="CardsRadio" Style="{StaticResource RailRadio}" ToolTip="Dashboard" IsChecked="True" Checked="Mode_Changed">
                         <Path Style="{StaticResource Icon}" Data="{StaticResource IconGrid}" />
@@ -558,8 +578,13 @@
                     <CheckBox x:Name="MultiBox" Style="{StaticResource SwitchBox}" Margin="0,12,0,0" HorizontalAlignment="Center"
                               ToolTip="Multi-instance: lets several Roblox clients run at once" Checked="Multi_Changed" Unchecked="Multi_Changed" />
                     <TextBlock Text="Multi" Foreground="{DynamicResource Muted}" FontSize="12" HorizontalAlignment="Center" Margin="0,6,0,0" />
+                    <CheckBox Style="{StaticResource SwitchBox}" Margin="0,12,0,0" HorizontalAlignment="Center"
+                              ToolTip="Motion: turn UI animations off to save a little CPU"
+                              IsChecked="{Binding On, Source={x:Static local:Animations.State}, Mode=TwoWay}" />
+                    <TextBlock Text="Motion" Foreground="{DynamicResource Muted}" FontSize="12" HorizontalAlignment="Center" Margin="0,6,0,0" />
                 </StackPanel>
             </Border>
         </Grid>
+    </Grid>
     </Grid>
 </Window>

@@ -15,6 +15,7 @@ if (args is ["multi-check"]) { RunMultiCheck(); return; }
 if (args is ["close-check"]) { RunCloseCheck(); return; }
 if (args is ["cookie-check"]) { await RunCookieCheck(); return; }
 if (args is ["settings-check"]) { RunSettingsCheck(); return; }
+if (args is ["anim-check", var mode]) { RunAnimCheck(mode == "sw"); return; }
 
 void Check(bool ok, string what) { if (!ok) { Console.WriteLine("FAIL: " + what); Environment.Exit(1); } }
 
@@ -142,6 +143,32 @@ Check(Supervisor.FirstFailure(events.Take(1)) is null, "a join alone is not a fa
     keeper.Clear();
     Check(!keeper.HasSaved && !keeper.Apply(), "clear stops applying");
     Directory.Delete(dir, true);
+}
+
+// Motion switch: on = the value animates, off = it jumps with no animation; old settings files default to motion on.
+{
+    string? problem = null;
+    var th = new Thread(() =>
+    {
+        try
+        {
+            var el = new System.Windows.Controls.Border { Opacity = 1 };
+            Animations.State.On = true;
+            Animations.Animate(el, UIElement.OpacityProperty, 0, 300);
+            if (!el.HasAnimatedProperties) problem = "with motion on the value should animate";
+            Animations.State.On = false;
+            Animations.Animate(el, UIElement.OpacityProperty, 0.25, 300);
+            if (el.HasAnimatedProperties || el.Opacity != 0.25) problem = "with motion off the value should jump, with no animation left running";
+        }
+        catch (Exception e) { problem = e.Message; }
+        finally { Animations.State.On = true; }
+    });
+    th.SetApartmentState(ApartmentState.STA);
+    th.Start();
+    th.Join();
+    Check(problem is null, "motion switch: " + problem);
+    Check(System.Text.Json.JsonSerializer.Deserialize<Settings>("{\"Multi\":true}")!.Animations, "settings saved before the switch existed keep motion on");
+    Check(!System.Text.Json.JsonSerializer.Deserialize<Settings>("{\"Animations\":false}")!.Animations, "motion off is read back from settings");
 }
 
 // The cookie may only ever go to Roblox over https (look-alike hosts and plain http are refused).
@@ -409,4 +436,81 @@ static void RunSettingsCheck()
         File.Delete(savedProfile + ".original");
         Console.WriteLine($"restored your original file; saved test profile removed. GraphicsQualityLevel={Value(file, "GraphicsQualityLevel")} FramerateCap={Value(file, "FramerateCap")}");
     }
+}
+
+// Measures what typical UI animations cost in CPU (percent of ONE core), with software or GPU rendering:
+//   dotnet run --project RoDock.Tests -- anim-check sw|hw
+static void RunAnimCheck(bool software)
+{
+    var t = new Thread(() =>
+    {
+        if (Environment.GetEnvironmentVariable("RODOCK_CAP") == "1") // same global cap RoDock applies in Program.Main
+            System.Windows.Media.Animation.Timeline.DesiredFrameRateProperty.OverrideMetadata(typeof(System.Windows.Media.Animation.Timeline), new FrameworkPropertyMetadata(30));
+        Console.WriteLine($"default animation frame rate in this run: {System.Windows.Media.Animation.Timeline.GetDesiredFrameRate(new System.Windows.Media.Animation.DoubleAnimation())?.ToString() ?? "60 (unset)"}");
+        var app = new System.Windows.Application();
+        if (software) System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+
+        var root = new System.Windows.Controls.StackPanel { Background = System.Windows.Media.Brushes.Black, Margin = new Thickness(20) };
+        var dots = new System.Windows.Controls.WrapPanel { Margin = new Thickness(0, 0, 0, 12) };
+        var dotList = Enumerable.Range(0, 12).Select(_ => new System.Windows.Shapes.Ellipse { Width = 14, Height = 14, Margin = new Thickness(4), Fill = System.Windows.Media.Brushes.LimeGreen }).ToList();
+        dotList.ForEach(d => dots.Children.Add(d));
+        var spinner = new System.Windows.Controls.Border { Width = 40, Height = 40, BorderThickness = new Thickness(5), BorderBrush = System.Windows.Media.Brushes.SkyBlue, CornerRadius = new CornerRadius(20), RenderTransformOrigin = new Point(.5, .5), RenderTransform = new System.Windows.Media.RotateTransform(), Margin = new Thickness(0, 0, 0, 12), HorizontalAlignment = HorizontalAlignment.Left };
+        var shimmer = new System.Windows.Shapes.Rectangle { Width = 120, Height = 8, Fill = System.Windows.Media.Brushes.White, RenderTransform = new System.Windows.Media.TranslateTransform() };
+        var bar = new System.Windows.Controls.Border { Width = 400, Height = 8, Background = System.Windows.Media.Brushes.DimGray, ClipToBounds = true, Child = shimmer, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 12) };
+        var big = new System.Windows.Controls.Border { Width = 900, Height = 300, CornerRadius = new CornerRadius(24), Background = System.Windows.Media.Brushes.SteelBlue };
+        root.Children.Add(dots); root.Children.Add(spinner); root.Children.Add(bar); root.Children.Add(big);
+        var win = new Window { Content = root, Width = 1000, Height = 640, Left = -3000, Top = 0, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Background = System.Windows.Media.Brushes.Black };
+        win.Show();
+
+        System.Windows.Media.Animation.DoubleAnimation Anim(double from, double to, double ms, int? fps)
+        {
+            var a = new System.Windows.Media.Animation.DoubleAnimation(from, to, TimeSpan.FromMilliseconds(ms)) { AutoReverse = true, RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever };
+            if (fps is { } f) System.Windows.Media.Animation.Timeline.SetDesiredFrameRate(a, f);
+            return a;
+        }
+        void Start(bool small, bool large, int? fps)
+        {
+            if (small)
+            {
+                foreach (var d in dotList) d.BeginAnimation(UIElement.OpacityProperty, Anim(1, .35, 900, fps));
+                var spin = new System.Windows.Media.Animation.DoubleAnimation(0, 360, TimeSpan.FromSeconds(1)) { RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever };
+                if (fps is { } f) System.Windows.Media.Animation.Timeline.SetDesiredFrameRate(spin, f);
+                ((System.Windows.Media.RotateTransform)spinner.RenderTransform).BeginAnimation(System.Windows.Media.RotateTransform.AngleProperty, spin);
+                ((System.Windows.Media.TranslateTransform)shimmer.RenderTransform).BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, Anim(-120, 400, 1500, fps));
+            }
+            if (large) big.BeginAnimation(UIElement.OpacityProperty, Anim(1, .6, 2000, fps));
+        }
+        void Stop()
+        {
+            foreach (var d in dotList) d.BeginAnimation(UIElement.OpacityProperty, null);
+            ((System.Windows.Media.RotateTransform)spinner.RenderTransform).BeginAnimation(System.Windows.Media.RotateTransform.AngleProperty, null);
+            ((System.Windows.Media.TranslateTransform)shimmer.RenderTransform).BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, null);
+            big.BeginAnimation(UIElement.OpacityProperty, null);
+        }
+
+        var phases = new (string Name, Action Begin)[]
+        {
+            ("nothing animating", () => { }),
+            ("12 pulsing dots + spinner + shimmer, 60 fps", () => Start(true, false, null)),
+            ("same, capped at 30 fps", () => { Stop(); Start(true, false, 30); }),
+            ("same + one big 900x300 panel fading, 60 fps", () => { Stop(); Start(true, true, null); }),
+            ("only the big fading panel, 30 fps", () => { Stop(); Start(false, true, 30); }),
+        };
+        Wait(2500); // let the window settle
+        var me = System.Diagnostics.Process.GetCurrentProcess();
+        Console.WriteLine($"[{(software ? "software" : "GPU")} rendering]");
+        Start(true, true, null); Wait(3000); Stop(); Wait(1500); // warm-up, so one-time JIT/start-up cost isn't counted
+        foreach (var (name, begin) in phases)
+        {
+            begin(); Wait(1500);
+            me.Refresh(); var cpu0 = me.TotalProcessorTime; var sw = System.Diagnostics.Stopwatch.StartNew();
+            Wait(6000);
+            me.Refresh(); var pct = (me.TotalProcessorTime - cpu0).TotalSeconds / sw.Elapsed.TotalSeconds * 100;
+            Console.WriteLine($"  {name,-48} {pct,5:0.0}% of one core");
+        }
+        win.Close();
+    });
+    t.SetApartmentState(ApartmentState.STA);
+    t.Start();
+    t.Join();
 }
