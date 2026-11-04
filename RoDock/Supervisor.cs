@@ -161,7 +161,9 @@ public class Supervisor
         catch (ArgumentException) { return true; }
     }
 
-    /// Asks the client to close (so Roblox leaves the server cleanly), force-kills it if it doesn't, and waits until it is gone.
+    /// Force-closes the clients we started and waits until they are gone. Not a polite close: that makes Roblox leave a hidden
+    /// "--launch-to-tray" copy, and killing that copy left a dead window handle that crashed every later launch (SingleInstanceGuard).
+    /// shortcut: the server sees the client vanish instead of leaving, so an immediate rejoin could be refused for a moment; the retry loop covers it.
     internal static Task CloseClients(Account a)
     {
         var pids = a.Pids;
@@ -174,16 +176,10 @@ public class Supervisor
                 {
                     using var p = Process.GetProcessById(pid);
                     if (p.ProcessName != "RobloxPlayerBeta") continue;
-                    p.CloseMainWindow();
-                    if (!p.WaitForExit(2000)) { p.Kill(true); p.WaitForExit(5000); }
+                    p.Kill(true);
+                    p.WaitForExit(5000);
                 }
-                catch (Exception e) when (e is ArgumentException or InvalidOperationException) { } // already gone
-
-            // After a normal close Roblox leaves a background "--launch-to-tray" copy behind; without this they pile up on every rejoin.
-            Thread.Sleep(1500);
-            foreach (var p in Process.GetProcessesByName("RobloxPlayerBeta"))
-                try { if (pids.Contains(NativeProcess.ParentPid(p))) { p.Kill(true); p.WaitForExit(3000); } }
-                catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception) { } // gone or not ours to touch
+                catch (Exception e) when (e is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception) { } // already gone, or not ours to touch
         });
     }
 }
