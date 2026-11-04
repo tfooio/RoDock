@@ -394,6 +394,32 @@ public partial class MainWindow : Window
     void StopSelected_Click(object s, RoutedEventArgs e) { foreach (var a in Ticked()) _supervisor.Stop(a); }
     void RemoveSelected_Click(object s, RoutedEventArgs e) { foreach (var a in Ticked()) Remove(a); }
 
+    // ---- roblox settings ----
+
+    void ToggleRobloxSettings_Click(object s, RoutedEventArgs e)
+    {
+        RobloxSettingsPanel.Visibility = RobloxSettingsPanel.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+        ShowRobloxSettingsState();
+    }
+
+    void ShowRobloxSettingsState() => RobloxSettingsState.Text = RobloxSettings.Default.HasSaved
+        ? "Saved settings are put back before every launch."
+        : "Nothing saved yet, so Roblox uses its own settings.";
+
+    void SaveRobloxSettings_Click(object s, RoutedEventArgs e)
+    {
+        try { RobloxSettings.Default.SaveCurrent(); Message.Text = "Saved. These Roblox settings are put back before every launch."; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Message.Text = ex.Message; }
+        ShowRobloxSettingsState();
+    }
+
+    void ClearRobloxSettings_Click(object s, RoutedEventArgs e)
+    {
+        try { RobloxSettings.Default.Clear(); Message.Text = "Stopped. Roblox uses its own settings again."; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Message.Text = ex.Message; }
+        ShowRobloxSettingsState();
+    }
+
     // ---- discord ----
 
     void ToggleDiscord_Click(object s, RoutedEventArgs e)

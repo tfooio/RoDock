@@ -172,6 +172,9 @@ public static class Roblox
         // Windows hands this string to Roblox's registered handler; whitespace could smuggle extra command-line arguments.
         if (uri.Any(char.IsWhiteSpace)) throw new InvalidOperationException("Refusing to launch: unexpected characters in the launch link.");
 
+        // Best effort: a settings file that can't be written must never stop an account from joining.
+        try { RobloxSettings.Default.Apply(); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+
         var before = RobloxPids();
         Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
 

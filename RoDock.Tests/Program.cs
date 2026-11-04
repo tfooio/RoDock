@@ -9,10 +9,12 @@ using System.Windows.Threading;
 using RoDock;
 
 if (args is ["preview", var outDir]) { RunPreview(outDir); return; }
+if (args is ["icon", var iconDir]) { IconMaker.Run(iconDir); return; }
 if (args is ["login-check"]) { RunLoginCheck(); return; }
 if (args is ["multi-check"]) { RunMultiCheck(); return; }
 if (args is ["close-check"]) { RunCloseCheck(); return; }
 if (args is ["cookie-check"]) { await RunCookieCheck(); return; }
+if (args is ["settings-check"]) { RunSettingsCheck(); return; }
 
 void Check(bool ok, string what) { if (!ok) { Console.WriteLine("FAIL: " + what); Environment.Exit(1); } }
 
@@ -107,6 +109,40 @@ Check(events[2] == new LogEvent(LogKind.Failure, 2) && events[1] == new LogEvent
 Check(events[4] == new LogEvent(LogKind.Failure, 285) && events[5] == new LogEvent(LogKind.Failure, 285), "log: disconnect reasons read as codes");
 Check(Supervisor.FirstFailure(events.Skip(1))!.Reason == "Error 2 (ConnectErrors)", "failure picks the first numbered error");
 Check(Supervisor.FirstFailure(events.Take(1)) is null, "a join alone is not a failure");
+
+// Roblox settings keeper (temp files, never the real ones).
+{
+    var dir = Path.Combine(Path.GetTempPath(), "rodock-settings-" + Guid.NewGuid());
+    Directory.CreateDirectory(dir);
+    var roblox = Path.Combine(dir, "GlobalBasicSettings_13.xml");
+    var kept = Path.Combine(dir, "saved", "roblox-settings.xml");
+    const string mine = "<roblox><Item><Properties><int name=\"GraphicsQualityLevel\">3</int><int name=\"FramerateCap\">60</int></Properties></Item></roblox>";
+    const string defaults = "<roblox><Item><Properties><int name=\"GraphicsQualityLevel\">0</int><int name=\"FramerateCap\">-1</int></Properties></Item></roblox>";
+    var keeper = new RobloxSettings(roblox, kept);
+
+    Check(!keeper.Apply() && !File.Exists(roblox), "apply with nothing saved does nothing");
+    try { keeper.SaveCurrent(); Check(false, "saving with no Roblox file must fail"); } catch (FileNotFoundException) { }
+
+    File.WriteAllText(roblox, mine);
+    keeper.SaveCurrent();
+    Check(keeper.HasSaved && File.ReadAllText(kept) == mine, "save copies the current Roblox settings");
+
+    File.WriteAllText(roblox, defaults); // Roblox resets them when a client starts
+    Check(keeper.Apply() && File.ReadAllText(roblox) == mine, "apply puts the saved settings back");
+    Check(File.ReadAllText(kept + ".original") == defaults, "the file Roblox had is backed up before the first replace");
+
+    File.WriteAllText(roblox, "<roblox>changed later</roblox>");
+    keeper.Apply();
+    Check(File.ReadAllText(kept + ".original") == defaults, "the backup is kept once and never overwritten");
+
+    File.WriteAllText(kept, "this is not xml");
+    File.WriteAllText(roblox, defaults);
+    Check(!keeper.Apply() && File.ReadAllText(roblox) == defaults, "a damaged saved copy is never applied");
+
+    keeper.Clear();
+    Check(!keeper.HasSaved && !keeper.Apply(), "clear stops applying");
+    Directory.Delete(dir, true);
+}
 
 // The cookie may only ever go to Roblox over https (look-alike hosts and plain http are refused).
 Check(Roblox.IsRoblox(new Uri("https://www.roblox.com/x")) && Roblox.IsRoblox(new Uri("https://roblox.com")) && Roblox.IsRoblox(new Uri("https://auth.roblox.com")), "roblox hosts allowed");
@@ -332,4 +368,45 @@ static async Task RunCookieCheck()
     Console.WriteLine($"after {(DateTime.Now - t0).TotalSeconds:0.0}s: running={a.Running} kind={a.StatusKind} status='{a.Status}' robloxProcesses={roblox}");
     var ok = !a.Running && a.StatusKind == Kind.Bad && a.Status.Contains("Cookie expired") && roblox == 0;
     Console.WriteLine(ok ? "cookie-check: PASS" : "cookie-check: FAIL");
+}
+
+// Needs Roblox installed; briefly starts one fake-ticket client. Answers: when a client starts, does Roblox keep the settings RoDock put
+// in place, or reset them? Uses the REAL settings file, so it backs it up first and always restores it.
+static void RunSettingsCheck()
+{
+    var real = RobloxSettings.Default;
+    var file = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Roblox", "GlobalBasicSettings_13.xml");
+    var savedProfile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RoDock", "roblox-settings.xml");
+    if (real.HasSaved) { Console.WriteLine("ABORT: you already have a saved profile; this check would replace it."); return; }
+
+    var original = File.ReadAllBytes(file);
+    static string Value(string path, string name) =>
+        System.Xml.Linq.XDocument.Load(path).Descendants().First(e => (string?)e.Attribute("name") == name).Value;
+    Console.WriteLine($"before: GraphicsQualityLevel={Value(file, "GraphicsQualityLevel")} FramerateCap={Value(file, "FramerateCap")}");
+    var before = System.Diagnostics.Process.GetProcessesByName("RobloxPlayerBeta").Select(p => p.Id).ToHashSet();
+    try
+    {
+        var doc = System.Xml.Linq.XDocument.Load(file);
+        foreach (var (name, v) in new[] { ("GraphicsQualityLevel", "5"), ("FramerateCap", "60") })
+            doc.Descendants().First(e => (string?)e.Attribute("name") == name).Value = v;
+        Directory.CreateDirectory(Path.GetDirectoryName(savedProfile)!);
+        doc.Save(savedProfile);
+        real.Apply();
+        Console.WriteLine($"applied: GraphicsQualityLevel={Value(file, "GraphicsQualityLevel")} FramerateCap={Value(file, "FramerateCap")}");
+
+        var uri = Roblox.BuildLaunchUri("FAKE-TICKET", 4924922222, null, null, Random.Shared.Next(100000, 999999).ToString(), DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri) { UseShellExecute = true });
+        Thread.Sleep(12000);
+        Console.WriteLine($"after a client started: GraphicsQualityLevel={Value(file, "GraphicsQualityLevel")} FramerateCap={Value(file, "FramerateCap")}  (file written {File.GetLastWriteTime(file):HH:mm:ss}, now {DateTime.Now:HH:mm:ss})");
+    }
+    finally
+    {
+        foreach (var p in System.Diagnostics.Process.GetProcessesByName("RobloxPlayerBeta").Where(p => !before.Contains(p.Id)))
+            try { p.Kill(true); p.WaitForExit(5000); } catch { }
+        Thread.Sleep(1500);
+        File.WriteAllBytes(file, original);
+        real.Clear();
+        File.Delete(savedProfile + ".original");
+        Console.WriteLine($"restored your original file; saved test profile removed. GraphicsQualityLevel={Value(file, "GraphicsQualityLevel")} FramerateCap={Value(file, "FramerateCap")}");
+    }
 }
