@@ -12,6 +12,7 @@ if (args is ["preview", var outDir]) { RunPreview(outDir); return; }
 if (args is ["login-check"]) { RunLoginCheck(); return; }
 if (args is ["multi-check"]) { RunMultiCheck(); return; }
 if (args is ["close-check"]) { RunCloseCheck(); return; }
+if (args is ["cookie-check"]) { await RunCookieCheck(); return; }
 
 void Check(bool ok, string what) { if (!ok) { Console.WriteLine("FAIL: " + what); Environment.Exit(1); } }
 
@@ -54,6 +55,8 @@ Check(Roblox.ShareCode("https://www.roblox.com/share?code=0ac3ad5cec2742449f1b43
 Check(Roblox.ShareCode("https://www.roblox.com/share?type=Server&code=abcdef0123456789") == "abcdef0123456789", "share link, params in other order");
 Check(Roblox.ShareCode("https://www.roblox.com/games/123/x?privateServerLinkCode=ABC") is null, "old-style link is not a share link");
 Check(Roblox.ShareCode("https://www.roblox.com/share?code=0ac3ad5cec2742449f1b430f67255478&type=ExperienceDetails") is null, "non-server share link ignored");
+
+Check(!Roblox.IsProtocolRegistered("roblox-no-such-scheme-xyz"), "unregistered protocol is reported as missing");
 
 // The cookie may only ever go to Roblox over https (look-alike hosts and plain http are refused).
 Check(Roblox.IsRoblox(new Uri("https://www.roblox.com/x")) && Roblox.IsRoblox(new Uri("https://roblox.com")) && Roblox.IsRoblox(new Uri("https://auth.roblox.com")), "roblox hosts allowed");
@@ -235,4 +238,19 @@ static void RunCloseCheck()
         if (left > 0) { ok = false; foreach (var p in Rb()) try { p.Kill(true); } catch { } Thread.Sleep(1000); }
     }
     Console.WriteLine(ok ? "close-check: PASS" : "close-check: FAIL (leftovers were killed by the harness)");
+}
+
+// Needs network and an installed Roblox, so it is a manual mode, not part of the default self-checks.
+// An expired/invalid cookie must stop the account with a clear message, launch nothing, and not keep retrying.
+static async Task RunCookieCheck()
+{
+    var a = new Account { Name = "bogus", Cookie = "this-is-not-a-real-cookie", UserId = 1, PlaceId = 4924922222 };
+    var sup = new Supervisor();
+    var t0 = DateTime.Now;
+    sup.Start(a);
+    while (a.Running && DateTime.Now - t0 < TimeSpan.FromSeconds(60)) await Task.Delay(500);
+    var roblox = System.Diagnostics.Process.GetProcessesByName("RobloxPlayerBeta").Length;
+    Console.WriteLine($"after {(DateTime.Now - t0).TotalSeconds:0.0}s: running={a.Running} kind={a.StatusKind} status='{a.Status}' robloxProcesses={roblox}");
+    var ok = !a.Running && a.StatusKind == Kind.Bad && a.Status.Contains("Cookie expired") && roblox == 0;
+    Console.WriteLine(ok ? "cookie-check: PASS" : "cookie-check: FAIL");
 }

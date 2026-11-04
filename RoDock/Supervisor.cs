@@ -58,7 +58,7 @@ public class Supervisor
                     }
                     else reason = "Did not get into the game in time";
                 }
-                catch (AuthException e) { Finish(a, e.Message, Kind.Bad); return; }
+                catch (Exception e) when (e is AuthException or RobloxNotInstalledException) { Finish(a, e.Message, Kind.Bad); return; } // retrying can't fix these
                 catch (OperationCanceledException) { throw; }
                 catch (Exception e) { reason = e.Message; }
 

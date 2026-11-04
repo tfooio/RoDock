@@ -9,6 +9,9 @@ namespace RoDock;
 /// The cookie was rejected by Roblox: stop retrying, the user must re-add the account.
 public class AuthException() : Exception("Cookie expired. Re-add the account.");
 
+/// Windows has no handler for roblox-player: links, so nothing can be launched. Retrying won't help.
+public class RobloxNotInstalledException() : Exception("Roblox is not installed. Install it from roblox.com, then press Start.");
+
 public static class Roblox
 {
     // Redirects are followed by hand in Send() so the cookie can never be forwarded to a non-Roblox host.
@@ -141,12 +144,20 @@ public static class Roblox
                $"+browsertrackerid:{trackerId}+robloxLocale:en_us+gameLocale:en_us+channel:+LaunchExp:InApp";
     }
 
+    public static bool IsProtocolRegistered(string scheme)
+    {
+        using var key = Microsoft.Win32.Registry.ClassesRoot.OpenSubKey($@"{scheme}\shell\open\command");
+        return key is not null;
+    }
+
     static HashSet<int> RobloxPids() => Process.GetProcessesByName("RobloxPlayerBeta").Select(p => p.Id).ToHashSet();
 
     /// Starts Roblox for the account and returns the new client's process ids.
     // shortcut: new clients are found by diffing process ids, so a Roblox started by another app in the same few seconds could be mistaken for ours.
     public static async Task<int[]> Launch(string cookie, long placeId, string? privateLink)
     {
+        if (!IsProtocolRegistered("roblox-player")) throw new RobloxNotInstalledException();
+
         string? access = null, code = LinkCode(privateLink);
         if (!string.IsNullOrWhiteSpace(privateLink))
         {
