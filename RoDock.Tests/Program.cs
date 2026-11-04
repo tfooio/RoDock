@@ -171,6 +171,21 @@ Check(Supervisor.FirstFailure(events.Take(1)) is null, "a join alone is not a fa
     Check(!System.Text.Json.JsonSerializer.Deserialize<Settings>("{\"Animations\":false}")!.Animations, "motion off is read back from settings");
 }
 
+// Multi-instance lock must be OWNED, not just created: another thread (standing in for a Roblox client) must not be able to take it.
+{
+    bool exists; try { using var probe = Mutex.OpenExisting("ROBLOX_singletonMutex"); exists = true; } catch (WaitHandleCannotBeOpenedException) { exists = false; }
+    if (!exists) // skip when a real Roblox, RoDock or Account Manager holds it
+    {
+        Roblox.SetMultiInstance(true);
+        bool clientCouldTake = true;
+        var th = new Thread(() => { using var m = Mutex.OpenExisting("ROBLOX_singletonMutex"); try { clientCouldTake = m.WaitOne(0); } catch (AbandonedMutexException) { clientCouldTake = true; } });
+        th.Start(); th.Join();
+        Check(!clientCouldTake, "multi-instance lock is owned, so a Roblox client cannot take it");
+        Roblox.SetMultiInstance(false);
+        Check(!Mutex.TryOpenExisting("ROBLOX_singletonMutex", out _), "turning multi-instance off removes the lock");
+    }
+}
+
 // The cookie may only ever go to Roblox over https (look-alike hosts and plain http are refused).
 Check(Roblox.IsRoblox(new Uri("https://www.roblox.com/x")) && Roblox.IsRoblox(new Uri("https://roblox.com")) && Roblox.IsRoblox(new Uri("https://auth.roblox.com")), "roblox hosts allowed");
 Check(!Roblox.IsRoblox(new Uri("https://evilroblox.com")) && !Roblox.IsRoblox(new Uri("https://roblox.com.evil.com")) &&

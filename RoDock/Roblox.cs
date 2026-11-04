@@ -227,14 +227,26 @@ public static class Roblox
         catch { return null; }
     }
 
-    /// Roblox quits at startup if the "ROBLOX_singletonMutex" mutex already exists, so we create it first.
+    /// Roblox clients try to acquire "ROBLOX_singletonMutex"; whoever gets it makes the client that already has it close its window.
+    /// So we must OWN it (not just create it), or the clients take it and evict each other. Call on one thread (the UI thread): a mutex is released by its owner thread.
     public static void SetMultiInstance(bool on)
     {
         if (on && _multi == null)
         {
-            _multi = new Mutex(false, "ROBLOX_singletonMutex", out var created);
-            if (!created) { _multi.Dispose(); _multi = null; throw new InvalidOperationException("Another app (or an open Roblox) already holds the multi-instance lock."); }
+            _multi = new Mutex(true, "ROBLOX_singletonMutex", out var created);
+            if (!created)
+            {
+                // It already existed: ours only if nobody holds it (or its holder died), i.e. no Roblox client or other manager is running.
+                bool owned;
+                try { owned = _multi.WaitOne(0); } catch (AbandonedMutexException) { owned = true; }
+                if (!owned) { _multi.Dispose(); _multi = null; throw new InvalidOperationException("Another app (or an open Roblox) already holds the multi-instance lock."); }
+            }
         }
-        else if (!on) { _multi?.Dispose(); _multi = null; }
+        else if (!on && _multi != null)
+        {
+            try { _multi.ReleaseMutex(); } catch (ApplicationException) { } // not owned by this thread
+            _multi.Dispose();
+            _multi = null;
+        }
     }
 }
