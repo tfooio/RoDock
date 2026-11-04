@@ -108,6 +108,7 @@ public partial class MainWindow : Window
         {
             if (e.PropertyName == nameof(Account.PrivateServerLink) && Regex.Match(a.PrivateServerLink, @"/games/(\d+)") is { Success: true } m && long.TryParse(m.Groups[1].Value, out var id))
                 a.PlaceId = id; // a private server link belongs to one place, so take the Place ID from it
+            if (e.PropertyName == nameof(Account.PrivateServerLink) && Roblox.ShareCode(a.PrivateServerLink) is { } share) _ = ResolveShare(a, share);
             if (e.PropertyName == nameof(Account.PlaceId)) _ = LoadGame(a);
             if (e.PropertyName == nameof(Account.Running)) RefreshSubtitle();
             if (Persisted.Contains(e.PropertyName)) _store.Save(_accounts);
@@ -116,6 +117,13 @@ public partial class MainWindow : Window
         _bot.Watch(a);
         _ = LoadAvatar(a);
         _ = LoadGame(a);
+    }
+
+    // Share links don't say which game they are for; ask Roblox so the card can show it.
+    async Task ResolveShare(Account a, string shareCode)
+    {
+        try { a.PlaceId = (await Roblox.ResolveShareLink(a.Cookie, shareCode)).PlaceId; }
+        catch (Exception ex) { Message.Text = ex.Message; }
     }
 
     static async Task LoadAvatar(Account a) => a.AvatarUrl = a.UserId > 0 ? await Roblox.AvatarUrl(a.UserId) : null;

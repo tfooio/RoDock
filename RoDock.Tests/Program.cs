@@ -49,6 +49,12 @@ Check((await cmds.Handle("start", " alpha ")).Contains("Starting **Alpha**"), "/
 Check((await cmds.Handle("stop", "Beta")).Contains("Stopped **Beta**"), "/stop");
 Check((await cmds.Handle("nonsense", "Beta")).StartsWith("Unknown command"), "unknown command");
 
+// New-style private server share links are recognised; other links are not mistaken for them.
+Check(Roblox.ShareCode("https://www.roblox.com/share?code=0ac3ad5cec2742449f1b430f67255478&type=Server") == "0ac3ad5cec2742449f1b430f67255478", "share link code");
+Check(Roblox.ShareCode("https://www.roblox.com/share?type=Server&code=abcdef0123456789") == "abcdef0123456789", "share link, params in other order");
+Check(Roblox.ShareCode("https://www.roblox.com/games/123/x?privateServerLinkCode=ABC") is null, "old-style link is not a share link");
+Check(Roblox.ShareCode("https://www.roblox.com/share?code=0ac3ad5cec2742449f1b430f67255478&type=ExperienceDetails") is null, "non-server share link ignored");
+
 // The cookie may only ever go to Roblox over https (look-alike hosts and plain http are refused).
 Check(Roblox.IsRoblox(new Uri("https://www.roblox.com/x")) && Roblox.IsRoblox(new Uri("https://roblox.com")) && Roblox.IsRoblox(new Uri("https://auth.roblox.com")), "roblox hosts allowed");
 Check(!Roblox.IsRoblox(new Uri("https://evilroblox.com")) && !Roblox.IsRoblox(new Uri("https://roblox.com.evil.com")) &&

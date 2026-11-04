@@ -98,6 +98,31 @@ public static class Roblox
 
     static string? LinkCode(string? link) => link is null ? null : Regex.Match(link, @"privateServerLinkCode=([^&\s]+)") is { Success: true } m ? m.Groups[1].Value : null;
 
+    /// The code of a new-style private server link (roblox.com/share?code=...&type=Server), or null if it isn't one.
+    public static string? ShareCode(string? link) =>
+        link is not null && link.Contains("type=Server", StringComparison.OrdinalIgnoreCase) && Regex.Match(link, @"roblox\.com/share\?[^#\s]*\bcode=([\w-]{8,64})") is { Success: true } m
+            ? m.Groups[1].Value : null;
+
+    /// Turns a new-style share link into the place and the old-style link code that the launch needs.
+    public static async Task<(long PlaceId, string LinkCode)> ResolveShareLink(string cookie, string shareCode)
+    {
+        using var res = await Send(HttpMethod.Post, "https://apis.roblox.com/sharelinks/v1/resolve-link", cookie, $"{{\"linkId\":\"{shareCode}\",\"linkType\":\"Server\"}}");
+        var body = await res.Content.ReadAsStringAsync();
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var d = doc.RootElement.GetProperty("privateServerInviteData");
+            return (d.GetProperty("placeId").GetInt64(), d.GetProperty("linkCode").GetString()!);
+        }
+        catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException or FormatException)
+        {
+            // Field names only (never values), so the message helps debugging without leaking codes.
+            string keys;
+            try { keys = string.Join(",", JsonDocument.Parse(body).RootElement.EnumerateObject().Select(p => p.Name)); } catch { keys = "not JSON"; }
+            throw new InvalidOperationException($"Could not resolve the private server share link (HTTP {(int)res.StatusCode}, response fields: {keys}). It may be expired, not for this account, or Roblox changed the format.");
+        }
+    }
+
     // The access code only exists inside the game page's HTML, so this breaks if Roblox redesigns that page.
     static async Task<string> GetAccessCode(string cookie, long placeId, string linkCode)
     {
@@ -125,7 +150,8 @@ public static class Roblox
         string? access = null, code = LinkCode(privateLink);
         if (!string.IsNullOrWhiteSpace(privateLink))
         {
-            if (code is null) throw new ArgumentException("Private server link must contain privateServerLinkCode=...");
+            if (ShareCode(privateLink) is { } share) (placeId, code) = await ResolveShareLink(cookie, share);
+            if (code is null) throw new ArgumentException("Private server link must be a roblox.com/share?code=...&type=Server link or contain privateServerLinkCode=...");
             access = await GetAccessCode(cookie, placeId, code);
         }
 

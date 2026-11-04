@@ -44,7 +44,7 @@ public class Supervisor
         {
             while (true)
             {
-                if (a.PlaceId is not > 0) { Finish(a, "Set a Place ID first", Kind.Bad); return; }
+                if (a.PlaceId is not > 0 && string.IsNullOrWhiteSpace(a.PrivateServerLink)) { Finish(a, "Set a Place ID first", Kind.Bad); return; }
                 if (!await Roblox.IsOnline()) { a.Report("Waiting for network...", Kind.Warn); await Task.Delay(15000, ct); continue; }
 
                 string reason;
@@ -82,7 +82,7 @@ public class Supervisor
             a.Report("Closing old client...", Kind.Working);
             await CloseClients(a);
             a.Report("Launching...", Kind.Working);
-            a.Pids = await Roblox.Launch(a.Cookie, a.PlaceId!.Value, a.PrivateServerLink);
+            a.Pids = await Roblox.Launch(a.Cookie, a.PlaceId ?? 0, a.PrivateServerLink);
 
             a.Report("Joining...", Kind.Working);
             for (var i = 0; i < 18; i++) // ~90 s
