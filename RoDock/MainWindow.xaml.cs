@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     readonly string _discordPath;
     DiscordConfig? _discord;
     readonly bool _ready;
+    bool _revertingMulti, _multiWanted;
 
     public ObservableCollection<Account> Accounts => _accounts;
 
@@ -49,7 +50,7 @@ public partial class MainWindow : Window
         Settings s = new();
         try { if (File.Exists(_settingsPath)) s = JsonSerializer.Deserialize<Settings>(File.ReadAllText(_settingsPath)) ?? s; } catch { }
         SimpleBox.IsChecked = s.Simple;
-        MultiBox.IsChecked = s.Multi;
+        MultiBox.IsChecked = _multiWanted = s.Multi;
         _ready = true;
         try { if (Vault.Read<DiscordConfig>(_discordPath) is { } cfg) _ = ConnectDiscord(cfg); }
         catch (Exception ex) { Message.Text = $"Could not read Discord settings: {ex.Message}"; }
@@ -229,20 +230,29 @@ public partial class MainWindow : Window
 
     void Multi_Changed(object s, RoutedEventArgs e)
     {
-        if (!_ready) return;
+        if (!_ready || _revertingMulti) return;
+        _multiWanted = MultiBox.IsChecked == true;
         ApplyMulti();
         SaveSettings();
     }
 
+    /// If the lock can't be taken (another app or an open Roblox holds it) the box is unticked, but that is not saved:
+    /// the preference stays "on" for the next launch.
     void ApplyMulti()
     {
         try { Roblox.SetMultiInstance(MultiBox.IsChecked == true); }
-        catch (Exception ex) { MultiBox.IsChecked = false; Message.Text = ex.Message; }
+        catch (Exception ex)
+        {
+            _revertingMulti = true;
+            MultiBox.IsChecked = false;
+            _revertingMulti = false;
+            Message.Text = ex.Message;
+        }
     }
 
     void SaveSettings(long[]? resume = null)
     {
-        try { Directory.CreateDirectory(Dir); File.WriteAllText(_settingsPath, JsonSerializer.Serialize(new Settings(SimpleBox.IsChecked == true, MultiBox.IsChecked == true, resume))); }
+        try { Directory.CreateDirectory(Dir); File.WriteAllText(_settingsPath, JsonSerializer.Serialize(new Settings(SimpleBox.IsChecked == true, _multiWanted, resume))); }
         catch { } // a lost preference is not worth an error dialog
     }
 }
