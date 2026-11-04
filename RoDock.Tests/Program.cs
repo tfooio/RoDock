@@ -10,6 +10,8 @@ using RoDock;
 
 if (args is ["preview", var outDir]) { RunPreview(outDir); return; }
 if (args is ["login-check"]) { RunLoginCheck(); return; }
+if (args is ["multi-check"]) { RunMultiCheck(); return; }
+if (args is ["close-check"]) { RunCloseCheck(); return; }
 
 void Check(bool ok, string what) { if (!ok) { Console.WriteLine("FAIL: " + what); Environment.Exit(1); } }
 
@@ -135,4 +137,96 @@ static void Wait(int ms)
     timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; };
     timer.Start();
     Dispatcher.PushFrame(frame);
+}
+
+// Launches Roblox clients with a FAKE login ticket (they cannot log in) to see how Roblox reacts to RoDock's multi-instance lock and
+// how its processes behave. Prints a timeline of every RobloxPlayerBeta process; always kills everything it started.
+//   phase A: lock ON, 2 launches   phase B: lock OFF, 2 launches   phase C: lock ON, close client 1's main process, launch again
+static void RunMultiCheck()
+{
+    static System.Diagnostics.Process[] Rb() => System.Diagnostics.Process.GetProcessesByName("RobloxPlayerBeta");
+    if (Rb().Length > 0) { Console.WriteLine("ABORT: close all Roblox windows first"); return; }
+
+    var start = DateTime.Now;
+    string T() => $"{(DateTime.Now - start).TotalSeconds,5:0.0}s";
+
+    static string Describe(System.Diagnostics.Process p)
+    {
+        try { return $"pid {p.Id}{(p.MainWindowHandle != 0 ? " [window]" : " [no window]")}"; } catch { return $"pid {p.Id} [?]"; }
+    }
+
+    // Watches for `seconds`, printing each process the moment it appears or disappears. Returns every pid ever seen.
+    HashSet<int> Watch(int seconds, HashSet<int> alreadyKnown)
+    {
+        var seen = new HashSet<int>(alreadyKnown);
+        var alive = Rb().Select(p => p.Id).ToHashSet();
+        for (var i = 0; i < seconds * 4; i++)
+        {
+            Thread.Sleep(250);
+            var now = Rb();
+            var nowIds = now.Select(p => p.Id).ToHashSet();
+            foreach (var p in now.Where(p => !alive.Contains(p.Id))) { Console.WriteLine($"  {T()} + appeared {Describe(p)}"); seen.Add(p.Id); }
+            foreach (var id in alive.Where(id => !nowIds.Contains(id))) Console.WriteLine($"  {T()} - exited   pid {id}");
+            alive = nowIds;
+        }
+        Console.WriteLine($"  {T()} alive now: {alive.Count} -> [{string.Join(", ", Rb().Select(Describe))}]");
+        return seen;
+    }
+
+    void Launch(string label)
+    {
+        Console.WriteLine($"  {T()} launching {label}");
+        var uri = Roblox.BuildLaunchUri("FAKE-TICKET", 4924922222, null, null, Random.Shared.Next(100000, 999999).ToString(), DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri) { UseShellExecute = true });
+    }
+
+    void KillAll()
+    {
+        foreach (var p in Rb()) try { p.Kill(true); p.WaitForExit(5000); } catch { }
+        Thread.Sleep(1500);
+        Console.WriteLine($"  cleanup: {Rb().Length} Roblox process(es) left");
+    }
+
+    foreach (var (name, lockOn) in new[] { ("A: lock ON, 2 launches", true), ("B: lock OFF, 2 launches", false) })
+    {
+        Console.WriteLine($"== {name}");
+        try { Roblox.SetMultiInstance(lockOn); } catch (Exception ex) { Console.WriteLine($"  lock: {ex.Message}"); continue; }
+        Launch("client 1"); var seen = Watch(9, []);
+        Launch("client 2"); Watch(9, seen);
+        Roblox.SetMultiInstance(false);
+        KillAll();
+    }
+
+    Console.WriteLine("== C: lock ON, launch 1, kill ONLY its main process (tray child stays), launch again");
+    try { Roblox.SetMultiInstance(true); } catch (Exception ex) { Console.WriteLine($"  lock: {ex.Message}"); return; }
+    Launch("client 1"); var s1 = Watch(9, []);
+    var main = Rb().FirstOrDefault(p => p.MainWindowHandle != 0);
+    if (main != null) { Console.WriteLine($"  {T()} killing main {main.Id}"); main.Kill(); main.WaitForExit(5000); }
+    Watch(3, s1);
+    Launch("client 2"); Watch(9, s1);
+    Roblox.SetMultiInstance(false);
+    KillAll();
+}
+
+// Launches a fake-ticket client 3 times in a row and closes it with RoDock's real close routine; nothing may be left behind.
+static void RunCloseCheck()
+{
+    static System.Diagnostics.Process[] Rb() => System.Diagnostics.Process.GetProcessesByName("RobloxPlayerBeta");
+    if (Rb().Length > 0) { Console.WriteLine("ABORT: close all Roblox windows first"); return; }
+
+    var ok = true;
+    for (var round = 1; round <= 3; round++)
+    {
+        var uri = Roblox.BuildLaunchUri("FAKE-TICKET", 4924922222, null, null, Random.Shared.Next(100000, 999999).ToString(), DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri) { UseShellExecute = true });
+        Thread.Sleep(9000);
+        var account = new Account { Pids = Rb().Select(p => p.Id).ToArray() };
+        var started = account.Pids.Length;
+        Supervisor.CloseClients(account).Wait();
+        Thread.Sleep(2000);
+        var left = Rb().Length;
+        Console.WriteLine($"round {round}: started {started} process(es), left after RoDock close: {left}");
+        if (left > 0) { ok = false; foreach (var p in Rb()) try { p.Kill(true); } catch { } Thread.Sleep(1000); }
+    }
+    Console.WriteLine(ok ? "close-check: PASS" : "close-check: FAIL (leftovers were killed by the harness)");
 }

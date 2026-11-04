@@ -129,7 +129,7 @@ public class Supervisor
     }
 
     /// Asks the client to close (so Roblox leaves the server cleanly), force-kills it if it doesn't, and waits until it is gone.
-    static Task CloseClients(Account a)
+    internal static Task CloseClients(Account a)
     {
         var pids = a.Pids;
         a.Pids = [];
@@ -144,6 +144,12 @@ public class Supervisor
                     if (!p.WaitForExit(2000)) { p.Kill(true); p.WaitForExit(5000); }
                 }
                 catch (Exception e) when (e is ArgumentException or InvalidOperationException) { } // already gone
+
+            // After a normal close Roblox leaves a background "--launch-to-tray" copy behind; without this they pile up on every rejoin.
+            Thread.Sleep(1500);
+            foreach (var p in Process.GetProcessesByName("RobloxPlayerBeta"))
+                try { if (pids.Contains(NativeProcess.ParentPid(p))) { p.Kill(true); p.WaitForExit(3000); } }
+                catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception) { } // gone or not ours to touch
         });
     }
 }
