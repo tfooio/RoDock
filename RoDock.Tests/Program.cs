@@ -211,11 +211,11 @@ static void RunPreview(string outDir)
         Velopack.VelopackApp.Build().Run(); // the real app does this in Program.Main
         var app = new RoDock.App();
         app.InitializeComponent();
-        foreach (var mode in new[] { "full", "simple", "empty", "midnight", "rose", "themes" })
+        foreach (var mode in new[] { "full", "simple", "empty", "ink", "midnight", "rose", "themes" })
         {
             var simple = mode == "simple";
             var custom = new Theme("Custom", "#102A43", "#1B3B5A", "#0B1F33", "#FF7A59", "#FFFFFF");
-            var themeName = mode switch { "midnight" => "Midnight", "rose" => "Rose", "themes" => "Custom", _ => null };
+            var themeName = mode switch { "ink" => "Ink", "midnight" => "Midnight", "rose" => "Rose", "themes" => "Custom", _ => null };
             var dir = Path.Combine(Path.GetTempPath(), "rl-preview-" + Guid.NewGuid());
             Directory.CreateDirectory(dir);
             var store = new Store(Path.Combine(dir, "accounts.dat"));
@@ -250,7 +250,6 @@ static void RunPreview(string outDir)
             w.UpdateText.Text = "Update to 0.2.0";
             w.UpdateToast.Visibility = Visibility.Visible;
             Wait(6000);
-
             var rtb = new RenderTargetBitmap((int)w.ActualWidth, (int)w.ActualHeight, 96, 96, PixelFormats.Pbgra32);
             rtb.Render(w);
             var enc = new PngBitmapEncoder();

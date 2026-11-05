@@ -24,6 +24,7 @@ public static class Themes
 {
     public static readonly Theme[] Presets =
     [
+        new("Ink", "#0E131C", "#141B26", "#0A0E15", "#7DB2F2", "#E8EEF7"),
         new("Dusty blue", "#3A5878", "#2B4666", "#1E3552", "#8CC4FF", "#F4F8FF"),
         new("Midnight", "#14161F", "#1D2030", "#0D0F16", "#7C8CFF", "#EEF0FA"),
         new("Forest", "#2F4A3F", "#243A31", "#182A22", "#7EE0A6", "#F1F8F3"),
@@ -66,10 +67,12 @@ public static class Themes
         Set("Muted", muted);
         Set("Ink", ink);
         Set("Scrim", Alpha(ink, 0.82));
-        Set("CardHi", Mix(card, accent, 0.3));
+        Set("Raised", Mix(card, text, 0.07));
+        Set("Neutral", Mix(card, text, 0.22));
+        Set("CardHi", Mix(card, text, 0.12));
         Set("BarDim", Mix(card, accent, 0.7));
         Set("Idle", Mix(muted, card, 0.35));
-        Set("TextSoft", Alpha(text, 0.16)); Set("TextEdge", Alpha(text, 0.35)); Set("TextFaint", Alpha(text, 0.10)); Set("Line", Alpha(text, 0.14));
+        Set("TextSoft", Alpha(text, 0.16)); Set("TextEdge", Alpha(text, 0.35)); Set("TextFaint", Alpha(text, 0.10)); Set("Line", Alpha(text, 0.09));
         Set("AccentSoft", Alpha(accent, 0.18)); Set("AccentFill", Alpha(accent, 0.20));
         Set("DeepDim", Alpha(deep, 0.65)); Set("DeepOverlay", Alpha(deep, 0.95));
     }

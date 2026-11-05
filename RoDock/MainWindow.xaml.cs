@@ -4,7 +4,6 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
-using ArcPath = System.Windows.Shapes.Path;
 
 namespace RoDock;
 
@@ -17,8 +16,8 @@ public record SlotVm(string Key, string Label, Brush Fill, Brush Ink, string Hex
 
 /// One line of the activity list; StatusKind picks the dot colour.
 public record FeedItem(string Text, string Time, Kind StatusKind);
-public record Bar(double Height, string Label, string Value, Brush Fill);
-public record Slice(string Hours, string Name, Brush Fill);
+public record Rank(string Name, string Hours, double Share, Brush Fill);
+public record StatVm(string Label, string Value, string Note);
 
 public partial class MainWindow : Window
 {
@@ -222,12 +221,12 @@ public partial class MainWindow : Window
 
     void RefreshSubtitle()
     {
-        var h = DateTime.Now.Hour;
         var inGame = _accounts.Count(a => a.StatusKind == Kind.Good);
-        GreetRun.Text = (h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening") + (_accounts.Count == 0 ? "" : ", ");
-        CountRun.Text = _accounts.Count == 0 ? "" : $"{inGame} of {_accounts.Count} in game";
+        GreetRun.Text = "Docks";
+        CountRun.Text = _accounts.Count == 0 ? "" : $"   {inGame} of {_accounts.Count} in game";
         DockCount.Text = $"{_accounts.Count} account{(_accounts.Count == 1 ? "" : "s")}";
         LineNote.Text = $"Now {inGame} of {_accounts.Count}";
+        RefreshCharts(); // the four numbers follow the live status
     }
 
     // ---- themes ----
@@ -308,57 +307,49 @@ public partial class MainWindow : Window
 
     // ---- charts ----
 
-    static readonly Color[] SliceColors = [Color.FromRgb(0x8C, 0xC4, 0xFF), Color.FromRgb(0x3D, 0xD6, 0xC0), Color.FromRgb(0xFB, 0xBF, 0x24), Color.FromRgb(0xFF, 0x8F, 0xB8), Color.FromRgb(0xA5, 0x9B, 0xFF)];
-
     void Chart_SizeChanged(object s, SizeChangedEventArgs e) => RefreshCharts();
 
     void RefreshCharts()
     {
-        // Line: accounts in game, hourly average over the last 24 h.
-        var hourly = _history.Hourly(24);
+        var inGame = _accounts.Count(a => a.StatusKind == Kind.Good);
         var max = Math.Max(1, _accounts.Count);
+
+        // Main chart: accounts in game, hourly average over the last 24 h. A count jumps, so it is drawn as steps.
+        var hourly = _history.Hourly(24);
         double w = LineCanvas.ActualWidth, h = LineCanvas.ActualHeight;
         if (w > 0 && h > 0)
         {
-            var pts = hourly.Select((v, i) => new Point(i * w / (hourly.Length - 1), h - 3 - Math.Min(v, max) / max * (h - 6))).ToList();
+            double X(int i) => i * w / (hourly.Length - 1);
+            double Y(double v) => h - 3 - Math.Min(v, max) / max * (h - 6);
+            var pts = new List<Point> { new(0, Y(hourly[0])) };
+            for (var i = 1; i < hourly.Length; i++) { pts.Add(new(X(i), Y(hourly[i - 1]))); pts.Add(new(X(i), Y(hourly[i]))); }
             LineLine.Points = new PointCollection(pts);
             LineArea.Points = new PointCollection(pts.Append(new Point(w, h)).Append(new Point(0, h)));
         }
 
-        // Bars: rejoins per day.
-        var days = _history.RejoinsPerDay(7);
-        var top = Math.Max(1, days.Max(d => d.Rejoins));
-        Brush accent = (Brush)FindResource("Accent"), dim = (Brush)FindResource("BarDim");
-        Bars.ItemsSource = days.Select(d => new Bar(Math.Max(4, d.Rejoins * 84.0 / top), d.Day.ToString("ddd")[..1], d.Rejoins > 0 ? d.Rejoins.ToString() : "", d.Rejoins == top && d.Rejoins > 0 ? accent : dim)).ToList();
-
-        // Donut: hours in game per account over 7 days.
+        // Ranked list: hours in game per account over 7 days. The leader gets the accent, the rest a neutral step.
         var minutes = _history.MinutesPerAccount(7).Where(kv => _accounts.Any(a => a.UserId == kv.Key) && kv.Value > 0).OrderByDescending(kv => kv.Value).ToList();
         var total = minutes.Sum(kv => kv.Value);
-        Donut.Children.Clear();
-        DonutTotal.Text = $"{total / 60.0:0.#} h";
-        var legend = new List<Slice>();
-        double start = 0;
-        for (var i = 0; i < minutes.Count; i++)
-        {
-            var brush = new SolidColorBrush(i < SliceColors.Length ? SliceColors[i] : ((SolidColorBrush)FindResource("BarDim")).Color);
-            var sweep = 360.0 * minutes[i].Value / total;
-            Donut.Children.Add(Arc(start, sweep, minutes.Count > 1, brush));
-            start += sweep;
-            if (i < 3) legend.Add(new Slice($"{minutes[i].Value / 60.0:0.#}h", _accounts.First(a => a.UserId == minutes[i].Key).Name, brush));
-        }
-        Legend.ItemsSource = legend;
-    }
+        Brush accent = (Brush)FindResource("Accent"), neutral = (Brush)FindResource("Neutral");
+        Ranks.ItemsSource = minutes.Select((kv, i) => new Rank(_accounts.First(a => a.UserId == kv.Key).Name, $"{kv.Value / 60.0:0.#} h", (double)kv.Value / minutes[0].Value, i == 0 ? accent : neutral)).ToList();
+        RankTotal.Text = $"{total / 60.0:0.#} h, 7 days";
 
-    /// A ring segment of the donut (radius 52 around the middle of a 128 px canvas); `gap` leaves a small space between segments.
-    static ArcPath Arc(double start, double sweep, bool gap, Brush stroke)
-    {
-        const double c = 64, r = 52;
-        static Point P(double deg) => new(c + r * Math.Sin(deg * Math.PI / 180), c - r * Math.Cos(deg * Math.PI / 180));
-        var a = start + (gap ? 0.75 : 0);
-        var b = Math.Min(start + sweep - (gap ? 0.75 : 0), start + 359.9);
-        var fig = new PathFigure { StartPoint = P(a) };
-        fig.Segments.Add(new ArcSegment(P(b), new Size(r, r), 0, b - a > 180, SweepDirection.Clockwise, true));
-        return new ArcPath { Data = new PathGeometry([fig]), Stroke = stroke, StrokeThickness = 16 };
+        // Four numbers.
+        var rejoins = _history.RejoinsPerDay(7).Sum(d => d.Rejoins);
+        var parts = new List<string>();
+        var launching = _accounts.Count(a => a.StatusKind == Kind.Working);
+        var retrying = _accounts.Count(a => a.Running && a.StatusKind is Kind.Warn or Kind.Bad);
+        var stopped = _accounts.Count(a => !a.Running);
+        if (launching > 0) parts.Add($"{launching} launching");
+        if (retrying > 0) parts.Add($"{retrying} retrying");
+        if (stopped > 0) parts.Add($"{stopped} stopped");
+        Stats.ItemsSource = new[]
+        {
+            new StatVm("In game now", $"{inGame} of {_accounts.Count}", parts.Count > 0 ? string.Join(", ", parts) : "All running"),
+            new StatVm("In game, 24 hours", $"{Math.Round(100 * hourly.Average() / max)}%", "Average across accounts"),
+            new StatVm("Rejoins, 7 days", rejoins.ToString(), $"{rejoins / 7.0:0.#} a day"),
+            new StatVm("Time online, 7 days", $"{total / 60.0:0.#} h", $"{minutes.Count} account{(minutes.Count == 1 ? "" : "s")}"),
+        };
     }
 
     void Login_Click(object s, RoutedEventArgs e)
@@ -487,7 +478,7 @@ public partial class MainWindow : Window
         DashView.Visibility = !simple && !empty ? Visibility.Visible : Visibility.Collapsed;
         EmptyView.Visibility = !simple && empty ? Visibility.Visible : Visibility.Collapsed;
         SimpleView.Visibility = SimpleActions.Visibility = simple ? Visibility.Visible : Visibility.Collapsed;
-        TitleText.FontSize = simple ? 20 : 30;
+        TitleText.FontSize = simple ? 20 : 28;
     }
 
     void Multi_Changed(object s, RoutedEventArgs e)
