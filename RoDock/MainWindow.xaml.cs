@@ -21,7 +21,8 @@ public record StatVm(string Label, string Value, string Note);
 
 public partial class MainWindow : Window
 {
-    static readonly string Dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RoDock");
+    // RODOCK_DATA lets the test project point the window at a scratch folder, so it can never touch real accounts or settings.
+    static readonly string Dir = Environment.GetEnvironmentVariable("RODOCK_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RoDock");
     static readonly HashSet<string?> Persisted = [nameof(Account.Name), nameof(Account.Cookie), nameof(Account.UserId), nameof(Account.PlaceId), nameof(Account.PrivateServerLink)];
 
     readonly Store _store;

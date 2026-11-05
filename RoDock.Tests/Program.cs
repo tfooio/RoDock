@@ -8,6 +8,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using RoDock;
 
+// App.xaml's StartupUri opens a real window in these modes; keep it on a scratch data folder, away from the user's accounts and settings (Motion is toggled below, which saves settings).
+if (args is ["preview", _] or ["motion-check"] or ["fps-probe"]) Environment.SetEnvironmentVariable("RODOCK_DATA", Path.Combine(Path.GetTempPath(), "rl-scratch-" + Guid.NewGuid()));
 if (args is ["preview", var outDir]) { RunPreview(outDir); return; }
 if (args is ["icon", var iconDir]) { IconMaker.Run(iconDir); return; }
 if (args is ["login-check"]) { RunLoginCheck(); return; }
@@ -17,6 +19,7 @@ if (args is ["cookie-check"]) { await RunCookieCheck(); return; }
 if (args is ["settings-check"]) { RunSettingsCheck(); return; }
 if (args is ["anim-check", var mode]) { RunAnimCheck(mode == "sw"); return; }
 if (args is ["motion-check"]) { RunMotionCheck(); return; }
+if (args is ["fps-probe"]) { RunFpsProbe(); return; }
 
 void Check(bool ok, string what) { if (!ok) { Console.WriteLine("FAIL: " + what); Environment.Exit(1); } }
 
@@ -302,6 +305,7 @@ static void RunMotionCheck()
     var t = new Thread(() =>
     {
         Velopack.VelopackApp.Build().Run(); // the real app does this in Program.Main
+        System.Windows.Media.Animation.Timeline.DesiredFrameRateProperty.OverrideMetadata(typeof(System.Windows.Media.Animation.Timeline), new FrameworkPropertyMetadata(60)); // as in Program.Main
         Animations.Hook();
         var app = new RoDock.App();
         app.InitializeComponent();
@@ -321,14 +325,18 @@ static void RunMotionCheck()
         static void Mouse(UIElement e, RoutedEvent ev) => e.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left) { RoutedEvent = ev, Source = e });
 
         // Entrance: mid-way it is partly faded, afterwards it is back at its own values.
-        // (Not at start-up: the first layout stalls the UI thread for longer than the animation lasts, so it just lands on the end.)
-        Wait(1500);
-        w.ListRadio.IsChecked = true;
-        Wait(200);
-        w.CardsRadio.IsChecked = true;
-        var seenFade = false;
-        for (var i = 0; i < 15 && !seenFade; i++) { Wait(20); seenFade = w.DashView.Opacity < 1; }
-        Is(seenFade, "dashboard should fade in when it comes back");
+        // (Called directly after a warm-up: at start-up and on a view switch the layout stalls the UI thread for longer than the animation lasts, so it would just land on the end.)
+        Wait(3000);
+        Animations.Enter(w.Stats);
+        Wait(300);
+        var seenFade = false; // sampled on each frame: a timer is starved by rendering while the fade runs
+        EventHandler sample = (_, _) => seenFade |= w.DashView.Opacity < 1;
+        CompositionTarget.Rendering += sample;
+        Animations.Enter(w.DashView);
+        Wait(400);
+        CompositionTarget.Rendering -= sample;
+        Is(seenFade, "dashboard should fade in");
+        w.ListRadio.IsChecked = true; w.CardsRadio.IsChecked = true; // switching views must not leave anything stuck
         Wait(1200);
         Is(w.DashView.Opacity == 1, "dashboard should end fully visible");
         Is(w.Cards.Items.Count > 0 && Below(w.Cards).OfType<FrameworkElement>().All(e => e.Opacity == 1), "dock tiles should end fully visible");
@@ -381,6 +389,46 @@ static void RunMotionCheck()
         host.Close();
         w.Close();
         Console.WriteLine("motion OK");
+    });
+    t.SetApartmentState(ApartmentState.STA);
+    t.Start();
+    t.Join();
+}
+
+// How many frames does an entrance really draw, per element? (60 fps over 200 ms is about 12.) Prints; checks nothing.
+static void RunFpsProbe()
+{
+    var t = new Thread(() =>
+    {
+        Velopack.VelopackApp.Build().Run();
+        System.Windows.Media.Animation.Timeline.DesiredFrameRateProperty.OverrideMetadata(typeof(System.Windows.Media.Animation.Timeline), new FrameworkPropertyMetadata(60));
+        var app = new RoDock.App();
+        app.InitializeComponent();
+        var dir = Path.Combine(Path.GetTempPath(), "rl-fps-" + Guid.NewGuid());
+        Directory.CreateDirectory(dir);
+        var store = new Store(Path.Combine(dir, "accounts.dat"));
+        store.Save([
+            new Account { Name = "builderman", Cookie = "x", UserId = 156, PlaceId = 4924922222 },
+            new Account { Name = "Shedletsky", Cookie = "x", UserId = 261, PlaceId = 4924922222 },
+            new Account { Name = "Roblox", Cookie = "x", UserId = 1, PlaceId = 920587237 },
+        ]);
+        File.WriteAllText(Path.Combine(dir, "settings.json"), System.Text.Json.JsonSerializer.Serialize(new Settings(false, false, null, "Ink", null)));
+        var w = new MainWindow(store, Path.Combine(dir, "settings.json")) { Left = -5000, Top = 0, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual };
+        w.Show();
+        Wait(4000);
+        foreach (var (name, el) in new (string, UIElement)[] { ("warm-up", w.Stats), ("whole dashboard", w.DashView), ("hero card", w.Hero), ("dock tiles", w.Cards), ("stat row", w.Stats), ("activity list", w.Feed) })
+        {
+            var steps = new HashSet<double>();
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            long done = 0;
+            EventHandler count = (_, _) => { if (el.Opacity < 1) { steps.Add(el.Opacity); done = clock.ElapsedMilliseconds; } };
+            CompositionTarget.Rendering += count;
+            Animations.Enter(el);
+            Wait(500);
+            CompositionTarget.Rendering -= count;
+            Console.WriteLine($"{name,-16} {steps.Count,3} frames over {done} ms");
+        }
+        w.Close();
     });
     t.SetApartmentState(ApartmentState.STA);
     t.Start();

@@ -11,7 +11,7 @@ namespace RoDock;
 
 /// The one switch for all UI motion, saved in the settings and shown as "Motion" in the right rail.
 /// Every animation here is a short one-shot on a render transform or opacity, so none of them touches layout, and each does nothing when motion is off.
-/// While on, every animation is capped at 30 fps (see Program.Main): measured at about half the CPU of 60 fps.
+/// Animations run at 60 fps (see Program.Main). Keep them one-shot: a looping animation would cost CPU all the time, and 30 fps was tried and looked choppy.
 ///
 /// What moves, and the rule behind it:
 ///   Hook()            buttons and toggles shrink to 0.97 while pressed; switch knobs slide ease-in-out and stretch 12%.
