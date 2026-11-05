@@ -56,6 +56,12 @@ public partial class MainWindow : Window
         _history = new History(Path.Combine(Path.GetDirectoryName(settingsPath)!, "history.json"));
         InitializeComponent();
 
+        // Entrances: whatever becomes visible eases in. Popovers grow from 0.95 at their trigger instead of rising.
+        foreach (UIElement p in new UIElement[] { DashView, EmptyView, SimpleView, ThemePanel, AddPanel, DiscordPanel, RobloxSettingsPanel, UpdateToast })
+            p.IsVisibleChanged += (s, e) => { if (e.NewValue is true) RoDock.Animations.Enter((UIElement)s); };
+        HeroSettings.IsVisibleChanged += (_, e) => { if (e.NewValue is true) RoDock.Animations.Enter(HeroSettings, rise: 0, scale: .95, origin: new Point(1, 0)); };
+        PickerPop.Opened += (_, _) => RoDock.Animations.Enter(Picker, rise: 0, scale: .95, origin: new Point(.5, 0));
+
         try { foreach (var a in _store.Load()) Hook(a); }
         catch (Exception ex)
         {
@@ -467,6 +473,13 @@ public partial class MainWindow : Window
     }
 
     // ---- settings ----
+
+    /// Dock tiles and activity rows ease in when created; tiles that appear together are staggered 30 ms apart (the first eight).
+    void Row_Loaded(object s, RoutedEventArgs e)
+    {
+        var el = (FrameworkElement)s;
+        RoDock.Animations.Enter(el, el.DataContext is Account a ? Math.Clamp(_accounts.IndexOf(a), 0, 8) * 30 : 0);
+    }
 
     void Mode_Changed(object s, RoutedEventArgs e) { if (_ready) { RefreshView(); SaveSettings(); } }
 

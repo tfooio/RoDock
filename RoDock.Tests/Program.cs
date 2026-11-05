@@ -16,6 +16,7 @@ if (args is ["close-check"]) { RunCloseCheck(); return; }
 if (args is ["cookie-check"]) { await RunCookieCheck(); return; }
 if (args is ["settings-check"]) { RunSettingsCheck(); return; }
 if (args is ["anim-check", var mode]) { RunAnimCheck(mode == "sw"); return; }
+if (args is ["motion-check"]) { RunMotionCheck(); return; }
 
 void Check(bool ok, string what) { if (!ok) { Console.WriteLine("FAIL: " + what); Environment.Exit(1); } }
 
@@ -288,6 +289,98 @@ static void RunLoginCheck()
         Console.WriteLine($"error: {w.Error ?? "none"}");
         Console.WriteLine($"cookie captured: {w.Cookie != null}");
         w.Close();
+    });
+    t.SetApartmentState(ApartmentState.STA);
+    t.Start();
+    t.Join();
+}
+
+// Drives the real window off-screen and reads the animated values: entrances start below 1 and settle at 1, press shrinks to 0.97 and comes back,
+// the title bar buttons stay put, the switch knob slides and stretches, a status turning good pulses its dot, and with Motion off nothing moves.
+static void RunMotionCheck()
+{
+    var t = new Thread(() =>
+    {
+        Velopack.VelopackApp.Build().Run(); // the real app does this in Program.Main
+        Animations.Hook();
+        var app = new RoDock.App();
+        app.InitializeComponent();
+        var dir = Path.Combine(Path.GetTempPath(), "rl-motion-" + Guid.NewGuid());
+        Directory.CreateDirectory(dir);
+        var store = new Store(Path.Combine(dir, "accounts.dat"));
+        store.Save([new Account { Name = "a", Cookie = "x", UserId = 1, PlaceId = 1 }]);
+        File.WriteAllText(Path.Combine(dir, "settings.json"), System.Text.Json.JsonSerializer.Serialize(new Settings(false, false, null, "Ink", null)));
+        var w = new MainWindow(store, Path.Combine(dir, "settings.json")) { Left = -5000, Top = 0, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual };
+        w.Show();
+        void Fail(string what) { Console.WriteLine("FAIL: " + what); Environment.Exit(1); }
+        void Is(bool ok, string what) { if (!ok) Fail(what); }
+        static IEnumerable<DependencyObject> Below(DependencyObject d)
+        {
+            for (var i = 0; i < VisualTreeHelper.GetChildrenCount(d); i++) { var c = VisualTreeHelper.GetChild(d, i); yield return c; foreach (var x in Below(c)) yield return x; }
+        }
+        static void Mouse(UIElement e, RoutedEvent ev) => e.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left) { RoutedEvent = ev, Source = e });
+
+        // Entrance: mid-way it is partly faded, afterwards it is back at its own values.
+        // (Not at start-up: the first layout stalls the UI thread for longer than the animation lasts, so it just lands on the end.)
+        Wait(1500);
+        w.ListRadio.IsChecked = true;
+        Wait(200);
+        w.CardsRadio.IsChecked = true;
+        var seenFade = false;
+        for (var i = 0; i < 15 && !seenFade; i++) { Wait(20); seenFade = w.DashView.Opacity < 1; }
+        Is(seenFade, "dashboard should fade in when it comes back");
+        Wait(1200);
+        Is(w.DashView.Opacity == 1, "dashboard should end fully visible");
+        Is(w.Cards.Items.Count > 0 && Below(w.Cards).OfType<FrameworkElement>().All(e => e.Opacity == 1), "dock tiles should end fully visible");
+
+        // Press: 0.97 while held, back to 1 after; the caption buttons are left alone.
+        var btn = w.ThemeToggle;
+        Mouse(btn, UIElement.PreviewMouseLeftButtonDownEvent);
+        Wait(250);
+        var scale = (ScaleTransform)((TransformGroup)btn.RenderTransform).Children[0];
+        Is(Math.Abs(scale.ScaleX - .97) < .005, $"held button should be at 0.97, was {scale.ScaleX}");
+        Mouse(btn, UIElement.PreviewMouseLeftButtonUpEvent);
+        Wait(400);
+        Is(scale.ScaleX == 1, $"released button should be back at 1, was {scale.ScaleX}");
+        Mouse(w.MaxButton, UIElement.PreviewMouseLeftButtonDownEvent);
+        Wait(150);
+        Is(w.MaxButton.RenderTransform is not TransformGroup, "caption buttons should not scale");
+        Mouse(w.MaxButton, UIElement.PreviewMouseLeftButtonUpEvent);
+
+        // Pulse: a status turning good grows its dot.
+        w.Accounts[0].Report("In game", Kind.Good);
+        Wait(150);
+        Is(Below(w.Cards).OfType<System.Windows.Shapes.Ellipse>().Any(e => e.RenderTransform is TransformGroup { Children: [ScaleTransform { ScaleX: > 1.2 }, _] }), "a dot should pulse when the status turns good");
+
+        // Switch knob: starts on the old side, stretched mid-way, rests at 0.
+        var host = new Window { Left = -5000, Top = 0, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual };
+        var cb = new System.Windows.Controls.CheckBox { Style = (Style)app.FindResource("SwitchBox"), Margin = new Thickness(20) };
+        host.Content = cb;
+        host.Show();
+        Wait(150);
+        var slide = (TranslateTransform)cb.Template.FindName("slide", cb);
+        var stretch = (ScaleTransform)cb.Template.FindName("stretch", cb);
+        cb.IsChecked = true;
+        Wait(100);
+        Is(slide.X < -1 && slide.X > -17 && stretch.ScaleX > 1.03, $"knob should be mid-slide and stretched, was x={slide.X} stretch={stretch.ScaleX}");
+        Wait(400);
+        Is(slide.X == 0 && stretch.ScaleX == 1, "knob should rest at 0");
+
+        // Motion off: no knob slide, no entrance, nothing left half-way.
+        Animations.State.On = false;
+        cb.IsChecked = false;
+        Wait(40);
+        Is(slide.X == 0, "no knob slide with motion off");
+        var b = new System.Windows.Controls.Border();
+        Animations.Enter(b);
+        Is(b.Opacity == 1 && b.RenderTransform is not TransformGroup, "no entrance with motion off");
+        Mouse(btn, UIElement.PreviewMouseLeftButtonDownEvent);
+        Wait(150);
+        Is(scale.ScaleX == 1, "no press scale with motion off");
+
+        host.Close();
+        w.Close();
+        Console.WriteLine("motion OK");
     });
     t.SetApartmentState(ApartmentState.STA);
     t.Start();
