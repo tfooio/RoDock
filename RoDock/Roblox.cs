@@ -152,6 +152,19 @@ public static class Roblox
 
     static HashSet<int> RobloxPids() => Process.GetProcessesByName("RobloxPlayerBeta").Select(p => p.Id).ToHashSet();
 
+    static readonly TimeSpan StubLifetime = TimeSpan.FromSeconds(10);
+
+    /// Clients not in `before` that have outlived the update stub.
+    static int[] Settled(HashSet<int> before)
+    {
+        var ids = new List<int>();
+        foreach (var p in Process.GetProcessesByName("RobloxPlayerBeta"))
+            using (p)
+                try { if (!before.Contains(p.Id) && DateTime.Now - p.StartTime > StubLifetime) ids.Add(p.Id); }
+                catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception) { } // exited meanwhile
+        return [.. ids];
+    }
+
     /// Starts Roblox for the account and returns the new client's process ids.
     // shortcut: new clients are found by diffing process ids, so a Roblox started by another app in the same few seconds could be mistaken for ours.
     public static async Task<int[]> Launch(string cookie, long placeId, string? privateLink)
@@ -178,17 +191,13 @@ public static class Roblox
         var before = RobloxPids();
         Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
 
-        // After a Roblox update the first client is a stub that starts the installer and exits within a second; the installer
-        // then starts the real client ~10-60 s later. So only count clients that are still alive after a short wait, and keep
-        // waiting (up to 2 min) while the installer runs. Returning the stub made the caller think it crashed and launch a second copy.
+        // Roblox's launch link often starts a stale stub first (it starts the installer and exits after 3-7 s); the installer then
+        // starts the real client 10-60 s later. So only a client that has been alive StubLifetime counts, and we keep waiting (up to
+        // 2 min) while the installer runs. Returning the stub made the caller think it crashed and launch a second copy.
         for (var i = 0; i < 120; i++)
         {
             await Task.Delay(1000);
-            if (RobloxPids().Except(before).ToArray() is { Length: > 0 } fresh)
-            {
-                await Task.Delay(2000);
-                if (RobloxPids().Intersect(fresh).ToArray() is { Length: > 0 } alive) return alive;
-            }
+            if (Settled(before) is { Length: > 0 } alive) return alive;
             if (i >= 30 && Process.GetProcessesByName("RobloxPlayerInstaller").Length == 0) break;
         }
         throw new InvalidOperationException("Roblox did not start.");
