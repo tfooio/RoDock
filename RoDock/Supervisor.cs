@@ -90,15 +90,16 @@ public class Supervisor
             a.Report("Closing old client...", Kind.Working);
             await CloseClients(a);
             a.Report("Launching...", Kind.Working);
-            a.Pids = await Roblox.Launch(a.Cookie, a.PlaceId ?? 0, a.PrivateServerLink);
-            a.Trace($"client pids {string.Join(",", a.Pids)}");
-            a.Log = a.Pids.Select(ClientLog.For).FirstOrDefault(l => l is not null);
+            var (pids, log) = await Roblox.Launch(a.Cookie, a.PlaceId ?? 0, a.PrivateServerLink, a.UserId);
+            a.Pids = pids;
+            a.Trace($"client pids {string.Join(",", a.Pids)}{(log is not null ? " (took the join)" : "")}");
+            a.Log = log ?? a.Pids.Select(ClientLog.For).FirstOrDefault(l => l is not null);
 
             a.Report("Joining...", Kind.Working);
             for (var i = 0; i < 18; i++) // ~90 s
             {
                 await Task.Delay(5000, ct);
-                if (a.Pids.All(IsDead)) return new Failure("Client closed while joining", Act.Retry);
+                if (a.Pids.Length > 0 && a.Pids.All(IsDead)) return new Failure("Client closed while joining", Act.Retry); // no pids = joining in an existing client
                 if (FirstFailure(a.Log?.Poll() ?? []) is { } failure) return failure;
                 if (await TryInGame(a) == true) { a.Report("In game", Kind.Good); return null; }
             }
@@ -117,7 +118,7 @@ public class Supervisor
         while (true)
         {
             await Task.Delay(5000, ct);
-            if (a.Pids.All(IsDead)) return new Failure("Client closed", Act.Retry);
+            if (a.Pids.Length > 0 && a.Pids.All(IsDead)) return new Failure("Client closed", Act.Retry);
 
             foreach (var e in a.Log?.Poll() ?? [])
                 if (e.Kind == LogKind.Join) pending = null; // joined again: it was a teleport

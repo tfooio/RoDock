@@ -165,9 +165,9 @@ public static class Roblox
         return [.. ids];
     }
 
-    /// Starts Roblox for the account and returns the new client's process ids.
+    /// Starts Roblox for the account and returns the client's process ids (and its log, when it was an existing client that took the join).
     // shortcut: new clients are found by diffing process ids, so a Roblox started by another app in the same few seconds could be mistaken for ours.
-    public static async Task<int[]> Launch(string cookie, long placeId, string? privateLink)
+    public static async Task<(int[] Pids, ClientLog? Log)> Launch(string cookie, long placeId, string? privateLink, long userId)
     {
         if (!IsProtocolRegistered("roblox-player")) throw new RobloxNotInstalledException();
 
@@ -189,19 +189,33 @@ public static class Roblox
         try { RobloxSettings.Default.Apply(); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
 
         var before = RobloxPids();
+        var existing = before.Select(pid => (Pid: pid, Log: ClientLog.For(pid))).Where(x => x.Log is not null).ToList();
+        foreach (var x in existing) x.Log!.Poll(); // skip what they logged before this launch
         Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
 
         // Roblox's launch link often starts a stale stub first (it starts the installer and exits after 3-7 s); the installer then
         // starts the real client 10-60 s later. So only a client that has been alive StubLifetime counts, and we keep waiting (up to
         // 2 min) while the installer runs. Returning the stub made the caller think it crashed and launch a second copy.
+        var stubSeen = false;
         for (var i = 0; i < 120; i++)
         {
             await Task.Delay(1000);
-            if (Settled(before) is { Length: > 0 } alive) return alive;
-            if (i >= 30 && Process.GetProcessesByName("RobloxPlayerInstaller").Length == 0) break;
+            if (Settled(before) is { Length: > 0 } alive) return (alive, null);
+            stubSeen |= RobloxPids().Except(before).Any();
+            if (NoNewClient(i, stubSeen, Process.GetProcessesByName("RobloxPlayerInstaller").Length > 0)) break;
         }
-        throw new InvalidOperationException("Roblox did not start.");
+        // Roblox keeps an idle "tray" copy of itself after a client closes. The launch link hands the join to that copy (the stub it
+        // starts exits at once), so no new client appears even though the account is joining. Failing here made RoDock launch again,
+        // and that second launch's updater closed the copy that was already in the game. So look for the existing client that logged
+        // this account joining; with none, return no pids and let the presence check decide.
+        // shortcut: the same account joining by another route inside this window would be taken for this launch.
+        var took = existing.Where(x => x.Log!.Poll().Any(e => e.Kind == LogKind.Join && e.UserId == userId)).ToList();
+        return (took.Select(x => x.Pid).ToArray(), took.Select(x => x.Log).FirstOrDefault());
     }
+
+    /// True once waiting for a new client is pointless: nothing is updating, and either only a throwaway stub came and went
+    /// (15 s covers a first client that is still settling) or nothing appeared at all for 30 s.
+    internal static bool NoNewClient(int second, bool stubSeen, bool installing) => !installing && (stubSeen ? second >= 15 : second >= 30);
 
     // --- pictures and names (public data, no login needed) ---
 

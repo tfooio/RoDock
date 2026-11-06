@@ -9,7 +9,8 @@ using System.Windows.Threading;
 using RoDock;
 
 // App.xaml's StartupUri opens a real window in these modes; keep it on a scratch data folder, away from the user's accounts and settings (Motion is toggled below, which saves settings).
-if (args is ["preview", _] or ["motion-check"] or ["fps-probe"]) Environment.SetEnvironmentVariable("RODOCK_DATA", Path.Combine(Path.GetTempPath(), "rl-scratch-" + Guid.NewGuid()));
+// The plain self-checks use it too: Account.Report writes trace.log there.
+Environment.SetEnvironmentVariable("RODOCK_DATA", Path.Combine(Path.GetTempPath(), "rl-scratch-" + Guid.NewGuid()));
 if (args is ["preview", var outDir]) { RunPreview(outDir); return; }
 if (args is ["icon", var iconDir]) { IconMaker.Run(iconDir); return; }
 if (args is ["login-check"]) { RunLoginCheck(); return; }
@@ -114,6 +115,21 @@ Check(events[2] == new LogEvent(LogKind.Failure, 2) && events[1] == new LogEvent
 Check(events[4] == new LogEvent(LogKind.Failure, 285) && events[5] == new LogEvent(LogKind.Failure, 285), "log: disconnect reasons read as codes");
 Check(Supervisor.FirstFailure(events.Skip(1))!.Reason == "Error 2 (ConnectErrors)", "failure picks the first numbered error");
 Check(Supervisor.FirstFailure(events.Take(1)) is null, "a join alone is not a failure");
+
+// A real line from an idle "tray" Roblox that took a launch (2026-11-06): the join is tied to the account, so RoDock can tell
+// which existing client joined for it. Noise lines that mention a user id differently must not match.
+var joined = ClientLog.Parse("""
+    2026-11-06T21:02:08.494Z,183.494446,1d28,6 [FLog::GameJoinLoadTime] Report game_join_loadtime: placeid:8304191830, join_time:0.53, universeid:3183403065, referral_page:RequestGame, sid:954a, clienttime:1793998928.47, userid:128777264,
+    2026-11-06T21:02:08.616Z,183.616135,718c,6 [FLog::LogWin32BTId] cookie Engine => Native set RBXEventTrackerV2 as CreateDate=11/06/2026&rbxid=127300260&rbxuid=128777264&browserid=108702724614
+    """).ToList();
+Check(joined.Count == 1 && joined[0] == new LogEvent(LogKind.Join, null, 128777264), "log: a join names the account that joined");
+
+// Waiting for a new Roblox client: the launch link's throwaway stub (gone in 3-7 s) must not end the wait early, but with no
+// update running and nothing new after that, stop at once instead of reporting a failure and launching again.
+Check(!Roblox.NoNewClient(5, stubSeen: true, installing: false), "no verdict while the stub could still be a client that is settling");
+Check(Roblox.NoNewClient(15, stubSeen: true, installing: false), "a stub that came and went with no update: an existing client took the launch");
+Check(!Roblox.NoNewClient(60, stubSeen: true, installing: true), "never give up while Roblox is updating");
+Check(!Roblox.NoNewClient(29, stubSeen: false, installing: false) && Roblox.NoNewClient(30, stubSeen: false, installing: false), "nothing at all: give up after 30 s");
 
 // Roblox settings keeper (temp files, never the real ones).
 {

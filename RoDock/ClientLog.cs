@@ -8,7 +8,7 @@ namespace RoDock;
 public enum LogKind { Join, Failure }
 
 /// Failure carries Roblox's error number when the log line has one.
-public record LogEvent(LogKind Kind, int? Code);
+public record LogEvent(LogKind Kind, int? Code, long? UserId = null);
 
 /// Reads one Roblox client's own log file, so errors show up in seconds instead of waiting for Roblox's online status to time out.
 public class ClientLog
@@ -17,7 +17,7 @@ public class ClientLog
 
     // Patterns taken from real client logs. Harmless noise like "SignalRCoreError ... Disconnected - stop() called" must not match.
     static readonly Regex Line = new(
-        @"(?<join>! Joining game )|Connection error (?<c1>\d+)|Disconnected from server for reason: \w+: (?<c2>\d+)|Sending disconnect with reason: (?<c3>\d+)|(?<fail>Connection attempt failed|Session Transition FSM: Error Occurred)",
+        @"(?<join>! Joining game )|game_join_loadtime:.*?userid:(?<uid>\d+)|Connection error (?<c1>\d+)|Disconnected from server for reason: \w+: (?<c2>\d+)|Sending disconnect with reason: (?<c3>\d+)|(?<fail>Connection attempt failed|Session Transition FSM: Error Occurred)",
         RegexOptions.Compiled);
 
     readonly string _path;
@@ -32,6 +32,7 @@ public class ClientLog
             var m = Line.Match(line);
             if (!m.Success) continue;
             if (m.Groups["join"].Success) { yield return new LogEvent(LogKind.Join, null); continue; }
+            if (m.Groups["uid"].Success) { yield return new LogEvent(LogKind.Join, null, long.Parse(m.Groups["uid"].Value)); continue; } // says whose join it was
             var code = new[] { "c1", "c2", "c3" }.Select(g => m.Groups[g]).FirstOrDefault(g => g.Success);
             yield return new LogEvent(LogKind.Failure, code is null ? null : int.Parse(code.Value));
         }

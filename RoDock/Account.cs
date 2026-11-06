@@ -61,7 +61,7 @@ public class Account : INotifyPropertyChanged
 
     public void Report(string text, Kind kind) { Status = text; StatusKind = kind; Trace(text); }
 
-    static readonly string TracePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RoDock", "trace.log");
+    static readonly string TracePath = Path.Combine(Environment.GetEnvironmentVariable("RODOCK_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RoDock"), "trace.log");
     string _lastTrace = "";
 
     /// Appends a line to %APPDATA%\RoDock\trace.log (no secrets: status text and process ids) so "why did it relaunch?" can be answered afterwards.
