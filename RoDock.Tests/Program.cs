@@ -139,6 +139,17 @@ Check(tp.DropTeleportNoise([new LogEvent(LogKind.Failure, 285)], t0.AddSeconds(3
 Check(tp.DropTeleportNoise([new LogEvent(LogKind.Failure, 277)], t0.AddSeconds(1)).Count == 1, "another error right after a join is kept");
 Check(new ClientLog("unused").DropTeleportNoise([new LogEvent(LogKind.Failure, 285)], t0).Count == 1, "285 with no join at all is kept");
 
+// Launching the newest client directly: the version name from Roblox's endpoint is checked before it becomes a path.
+var vdir = Path.Combine(Path.GetTempPath(), "rodock-versions-" + Guid.NewGuid());
+Directory.CreateDirectory(Path.Combine(vdir, "version-f0ea5da9412f4e35"));
+File.WriteAllText(Path.Combine(vdir, "version-f0ea5da9412f4e35", "RobloxPlayerBeta.exe"), "");
+Directory.CreateDirectory(Path.Combine(vdir, "version-979c2547603d4dd8")); // installed but without a client exe (half-installed)
+Check(Roblox.PlayerExe("version-f0ea5da9412f4e35", vdir) == Path.Combine(vdir, "version-f0ea5da9412f4e35", "RobloxPlayerBeta.exe"), "latest version: its exe is used when installed");
+Check(Roblox.PlayerExe("version-aaaaaaaaaaaaaaaa", vdir) is null, "latest version not installed: fall back to the registered launcher");
+Check(Roblox.PlayerExe("version-979c2547603d4dd8", vdir) is null, "a version folder without the exe is not used");
+Check(Roblox.PlayerExe(@"..\..\evil", vdir) is null && Roblox.PlayerExe(@"version-f0ea5da9412f4e35\..\x", vdir) is null && Roblox.PlayerExe(null, vdir) is null && Roblox.PlayerExe("", vdir) is null, "odd version names are refused");
+Directory.Delete(vdir, true);
+
 // Waiting for a new Roblox client: the launch link's throwaway stub (gone in 3-7 s) must not end the wait early, but with no
 // update running and nothing new after that, stop at once instead of reporting a failure and launching again.
 Check(!Roblox.NoNewClient(5, stubSeen: true, installing: false), "no verdict while the stub could still be a client that is settling");

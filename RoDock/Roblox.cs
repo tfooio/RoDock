@@ -152,6 +152,25 @@ public static class Roblox
 
     static HashSet<int> RobloxPids() => Process.GetProcessesByName("RobloxPlayerBeta").Select(p => p.Id).ToHashSet();
 
+    static readonly string VersionsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Roblox", "Versions");
+
+    /// The newest Roblox client's exe if it is installed, else null (offline, or the update is not downloaded yet).
+    /// Going through Windows' roblox-player: handler instead starts whatever older build it was registered to, which then updates and
+    /// hands the launch on, and that is where the stub, the double launches and the stale idle copies came from.
+    static async Task<string?> LatestPlayerExe()
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(await Http.GetStringAsync("https://clientsettingscdn.roblox.com/v2/client-version/WindowsPlayer"));
+            return PlayerExe(doc.RootElement.GetProperty("clientVersionUpload").GetString(), VersionsDir);
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException or KeyNotFoundException) { return null; }
+    }
+
+    /// The version name becomes part of a path, so it must look like Roblox's own ("version-" + hex).
+    internal static string? PlayerExe(string? version, string versionsDir) =>
+        version is not null && Regex.IsMatch(version, "^version-[0-9a-f]{8,32}$") && Path.Combine(versionsDir, version, "RobloxPlayerBeta.exe") is var exe && File.Exists(exe) ? exe : null;
+
     static readonly TimeSpan StubLifetime = TimeSpan.FromSeconds(10);
 
     /// Clients not in `before` that have outlived the update stub.
@@ -191,7 +210,8 @@ public static class Roblox
         var before = RobloxPids();
         var existing = before.Select(pid => (Pid: pid, Log: ClientLog.For(pid))).Where(x => x.Log is not null).ToList();
         foreach (var x in existing) x.Log!.Poll(); // skip what they logged before this launch
-        Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
+        if (await LatestPlayerExe() is { } exe) Process.Start(new ProcessStartInfo(exe) { ArgumentList = { uri } }); // the same command line Roblox's own installer uses
+        else Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true }); // not installed yet: the registered launcher downloads it
 
         // Roblox's launch link often starts a stale stub first (it starts the installer and exits after 3-7 s); the installer then
         // starts the real client 10-60 s later. So only a client that has been alive StubLifetime counts, and we keep waiting (up to

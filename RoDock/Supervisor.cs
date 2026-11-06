@@ -92,7 +92,7 @@ public class Supervisor
             a.Report("Launching...", Kind.Working);
             var (pids, log) = await Roblox.Launch(a.Cookie, a.PlaceId ?? 0, a.PrivateServerLink, a.UserId);
             a.Pids = pids;
-            a.Trace($"client pids {string.Join(",", a.Pids)}{(log is not null ? " (took the join)" : "")}");
+            a.Trace($"client pids {string.Join(",", a.Pids.Select(p => $"{p} {Build(p)}"))}{(log is not null ? " (took the join)" : "")}");
             a.Log = log ?? a.Pids.Select(ClientLog.For).FirstOrDefault(l => l is not null);
 
             a.Report("Joining...", Kind.Working);
@@ -155,6 +155,13 @@ public class Supervisor
         try { return await Roblox.IsInGame(a.Cookie, a.UserId); }
         catch (HttpRequestException) { return null; }
         catch (TaskCanceledException) { return null; }
+    }
+
+    /// Which Roblox build a client runs, for the trace ("version-..."); "?" if it can't be read.
+    static string Build(int pid)
+    {
+        try { using var p = Process.GetProcessById(pid); return Path.GetFileName(Path.GetDirectoryName(p.MainModule?.FileName)) ?? "?"; }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception) { return "?"; }
     }
 
     static bool IsDead(int pid)
