@@ -178,10 +178,18 @@ public static class Roblox
         var before = RobloxPids();
         Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
 
-        for (var i = 0; i < 30; i++)
+        // After a Roblox update the first client is a stub that starts the installer and exits within a second; the installer
+        // then starts the real client ~10-60 s later. So only count clients that are still alive after a short wait, and keep
+        // waiting (up to 2 min) while the installer runs. Returning the stub made the caller think it crashed and launch a second copy.
+        for (var i = 0; i < 120; i++)
         {
             await Task.Delay(1000);
-            if (RobloxPids().Except(before).ToArray() is { Length: > 0 }) { await Task.Delay(2000); return RobloxPids().Except(before).ToArray(); }
+            if (RobloxPids().Except(before).ToArray() is { Length: > 0 } fresh)
+            {
+                await Task.Delay(2000);
+                if (RobloxPids().Intersect(fresh).ToArray() is { Length: > 0 } alive) return alive;
+            }
+            if (i >= 30 && Process.GetProcessesByName("RobloxPlayerInstaller").Length == 0) break;
         }
         throw new InvalidOperationException("Roblox did not start.");
     }
