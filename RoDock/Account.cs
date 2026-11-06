@@ -59,5 +59,22 @@ public class Account : INotifyPropertyChanged
     /// The Roblox log of the client we started (not saved).
     [JsonIgnore] public ClientLog? Log;
 
-    public void Report(string text, Kind kind) { Status = text; StatusKind = kind; }
+    public void Report(string text, Kind kind) { Status = text; StatusKind = kind; Trace(text); }
+
+    static readonly string TracePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RoDock", "trace.log");
+    string _lastTrace = "";
+
+    /// Appends a line to %APPDATA%\RoDock\trace.log (no secrets: status text and process ids) so "why did it relaunch?" can be answered afterwards.
+    public void Trace(string text)
+    {
+        var key = System.Text.RegularExpressions.Regex.Replace(text, @"Retrying in \d+s", "Retrying"); // one line per countdown, not per second
+        if (key == _lastTrace) return;
+        _lastTrace = key;
+        try
+        {
+            if (File.Exists(TracePath) && new FileInfo(TracePath).Length > 1_000_000) File.Delete(TracePath); // shortcut: wipes instead of rotating
+            File.AppendAllText(TracePath, $"{DateTime.UtcNow:HH:mm:ss.fff} {Name}: {text}\n");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { } // tracing must never break an account
+    }
 }

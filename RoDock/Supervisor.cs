@@ -91,6 +91,7 @@ public class Supervisor
             await CloseClients(a);
             a.Report("Launching...", Kind.Working);
             a.Pids = await Roblox.Launch(a.Cookie, a.PlaceId ?? 0, a.PrivateServerLink);
+            a.Trace($"client pids {string.Join(",", a.Pids)}");
             a.Log = a.Pids.Select(ClientLog.For).FirstOrDefault(l => l is not null);
 
             a.Report("Joining...", Kind.Working);
@@ -167,6 +168,7 @@ public class Supervisor
     internal static Task CloseClients(Account a)
     {
         var pids = a.Pids;
+        if (pids.Length > 0) a.Trace($"closing pids {string.Join(",", pids)}");
         a.Pids = [];
         a.Log = null;
         return Task.Run(() =>
