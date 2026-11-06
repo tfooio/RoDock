@@ -124,6 +124,21 @@ var joined = ClientLog.Parse("""
     """).ToList();
 Check(joined.Count == 1 && joined[0] == new LogEvent(LogKind.Join, null, 128777264), "log: a join names the account that joined");
 
+// A teleport inside the game (real log, 2026-11-06 21:53:43): the join, then the old connection closing as 285 within 0.1 s. That is not a
+// failure; 285 with no recent join (the player left) still is, and so is any other error right after a join.
+var tp = new ClientLog("unused");
+var t0 = new DateTime(2026, 11, 6, 21, 53, 43, DateTimeKind.Utc);
+var teleport = ClientLog.Parse("""
+    2026-11-06T21:53:43.002Z,1,1,6 [FLog::Output] ! Joining game '6a7c' place 14918509670 at 10.221.44.142
+    2026-11-06T21:53:43.085Z,1,1,6 [FLog::Network] Sending disconnect with reason: 285
+    2026-11-06T21:53:43.104Z,1,1,6 [DFLog::RbxTransportDummyClient] Disconnected from server for reason: Player: 285 (DisconnectClientInitiated)
+    """).ToList();
+Check(tp.DropTeleportNoise(teleport, t0).Select(e => e.Kind).SequenceEqual([LogKind.Join]), "teleport: the old connection closing (285) right after the new join is dropped");
+Check(tp.DropTeleportNoise([new LogEvent(LogKind.Failure, 285)], t0.AddSeconds(5)).Count == 0, "teleport: still dropped when it is read in the next poll");
+Check(tp.DropTeleportNoise([new LogEvent(LogKind.Failure, 285)], t0.AddSeconds(30)).Count == 1, "285 long after the join is a real exit");
+Check(tp.DropTeleportNoise([new LogEvent(LogKind.Failure, 277)], t0.AddSeconds(1)).Count == 1, "another error right after a join is kept");
+Check(new ClientLog("unused").DropTeleportNoise([new LogEvent(LogKind.Failure, 285)], t0).Count == 1, "285 with no join at all is kept");
+
 // Waiting for a new Roblox client: the launch link's throwaway stub (gone in 3-7 s) must not end the wait early, but with no
 // update running and nothing new after that, stop at once instead of reporting a failure and launching again.
 Check(!Roblox.NoNewClient(5, stubSeen: true, installing: false), "no verdict while the stub could still be a client that is settling");

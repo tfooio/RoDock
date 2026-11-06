@@ -23,7 +23,24 @@ public class ClientLog
     readonly string _path;
     long _pos;
 
-    ClientLog(string path) => _path = path;
+    internal ClientLog(string path) => _path = path;
+
+    static readonly TimeSpan TeleportWindow = TimeSpan.FromSeconds(15);
+    DateTime _lastJoin = DateTime.MinValue;
+
+    /// A teleport between a game's places logs the new join first and, ~0.1 s later, the old connection closing as error 285
+    /// ("client initiated"). Left in, that read as a failure after the join and RoDock closed a healthy client 25 s later.
+    internal List<LogEvent> DropTeleportNoise(IEnumerable<LogEvent> events, DateTime now)
+    {
+        var kept = new List<LogEvent>();
+        foreach (var e in events)
+        {
+            if (e.Kind == LogKind.Join) _lastJoin = now;
+            else if (e.Code == 285 && now - _lastJoin < TeleportWindow) continue;
+            kept.Add(e);
+        }
+        return kept;
+    }
 
     public static IEnumerable<LogEvent> Parse(string text)
     {
@@ -73,7 +90,7 @@ public class ClientLog
             var end = Array.LastIndexOf(bytes, (byte)'\n', read - 1);
             if (end < 0) return [];
             _pos += end + 1;
-            return Parse(Encoding.UTF8.GetString(bytes, 0, end + 1)).ToList();
+            return DropTeleportNoise(Parse(Encoding.UTF8.GetString(bytes, 0, end + 1)), DateTime.UtcNow);
         }
         catch (IOException) { return []; } // locked or gone for a moment; try again on the next tick
     }
