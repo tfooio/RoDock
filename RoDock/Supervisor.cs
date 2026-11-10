@@ -126,7 +126,9 @@ public class Supervisor
                 {
                     pending = FirstFailure([e]);
                     pendingAt = DateTime.UtcNow;
-                    a.Report($"{pending!.Reason}, waiting to see if it rejoins...", Kind.Warn);
+                    // Trace only: a teleport logs its 285 and its join in either order (285 first in 202 of 269 real cases, by up to 8 s), so
+                    // showing a warning here sent a false "trouble" alert to Discord on every place change. A real drop is reported below once the wait ends.
+                    a.Trace($"{pending!.Reason}, waiting to see if it rejoins...");
                 }
             if (pending is not null && DateTime.UtcNow - pendingAt > TimeSpan.FromSeconds(25)) return pending;
 
@@ -135,7 +137,7 @@ public class Supervisor
             {
                 case true: misses = 0; if (pending is null) a.Report("In game", Kind.Good); break;
                 case false when ++misses >= 3: return pending ?? new Failure("Left the game", Act.Retry);
-                case false: a.Report($"Not in game ({misses}/3)...", Kind.Warn); break;
+                case false: a.Trace($"Not in game ({misses}/3)..."); break; // presence lags during a place change (55 one-or-two-miss blips, all recovered); only the third miss is reported
             }
         }
     }
