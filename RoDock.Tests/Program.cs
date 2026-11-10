@@ -150,6 +150,15 @@ Check(Roblox.PlayerExe("version-979c2547603d4dd8", vdir) is null, "a version fol
 Check(Roblox.PlayerExe(@"..\..\evil", vdir) is null && Roblox.PlayerExe(@"version-f0ea5da9412f4e35\..\x", vdir) is null && Roblox.PlayerExe(null, vdir) is null && Roblox.PlayerExe("", vdir) is null, "odd version names are refused");
 Directory.Delete(vdir, true);
 
+// A pinned Roblox version that isn't installed must fail the launch, never quietly run another build.
+var scratch = Environment.GetEnvironmentVariable("RODOCK_DATA")!;
+Directory.CreateDirectory(scratch);
+File.WriteAllText(Path.Combine(scratch, "roblox-version.txt"), "version-aaaaaaaaaaaaaaaa");
+var pinRefused = false;
+try { await Roblox.WantedPlayerExe(); } catch (InvalidOperationException) { pinRefused = true; }
+File.Delete(Path.Combine(scratch, "roblox-version.txt"));
+Check(pinRefused, "pinned version not installed: the launch fails instead of using another build");
+
 // Waiting for a new Roblox client: the launch link's throwaway stub (gone in 3-7 s) must not end the wait early, but with no
 // update running and nothing new after that, stop at once instead of reporting a failure and launching again.
 Check(!Roblox.NoNewClient(5, stubSeen: true, installing: false), "no verdict while the stub could still be a client that is settling");

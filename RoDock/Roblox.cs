@@ -157,6 +157,15 @@ public static class Roblox
     /// The newest Roblox client's exe if it is installed, else null (offline, or the update is not downloaded yet).
     /// Going through Windows' roblox-player: handler instead starts whatever older build it was registered to, which then updates and
     /// hands the launch on, and that is where the stub, the double launches and the stale idle copies came from.
+    static readonly string PinFile = Path.Combine(Environment.GetEnvironmentVariable("RODOCK_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RoDock"), "roblox-version.txt");
+
+    /// A version named in roblox-version.txt (e.g. version-f0ea5da9412f4e35) is used instead of the latest; delete the file to follow the latest again.
+    /// A pin that isn't installed fails the launch rather than silently running another build.
+    internal static async Task<string?> WantedPlayerExe() =>
+        File.Exists(PinFile) && File.ReadAllText(PinFile).Trim() is { Length: > 0 } pin
+            ? PlayerExe(pin, VersionsDir) ?? throw new InvalidOperationException($"Pinned Roblox {pin} is not installed")
+            : await LatestPlayerExe();
+
     static async Task<string?> LatestPlayerExe()
     {
         try
@@ -210,7 +219,7 @@ public static class Roblox
         var before = RobloxPids();
         var existing = before.Select(pid => (Pid: pid, Log: ClientLog.For(pid))).Where(x => x.Log is not null).ToList();
         foreach (var x in existing) x.Log!.Poll(); // skip what they logged before this launch
-        if (await LatestPlayerExe() is { } exe) Process.Start(new ProcessStartInfo(exe) { ArgumentList = { uri } }); // the same command line Roblox's own installer uses
+        if (await WantedPlayerExe() is { } exe) Process.Start(new ProcessStartInfo(exe) { ArgumentList = { uri } }); // the same command line Roblox's own installer uses
         else Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true }); // not installed yet: the registered launcher downloads it
 
         // Roblox's launch link often starts a stale stub first (it starts the installer and exits after 3-7 s); the installer then
